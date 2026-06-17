@@ -1,0 +1,14 @@
+README.md
+  h_7cae82992be157 101-103
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "db1ebd474dad5f099a21c3c1ab584beaa6df4959",
+  "prompts": {},
+  "humans": {
+    "h_7cae82992be157": {
+      "author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  }
+}
