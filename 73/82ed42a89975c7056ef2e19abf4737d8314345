@@ -1,0 +1,19 @@
+.gitignore
+  s_abce19ce3faba7::t_aa06162b49c931 5-8,24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "7382ed42a89975c7056ef2e19abf4737d8314345",
+  "prompts": {},
+  "sessions": {
+    "s_abce19ce3faba7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4ea9-d6d1-7c53-8a81-424160a73062",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Stephen Chu <stephen.chu@langchain.dev>"
+    }
+  }
+}
