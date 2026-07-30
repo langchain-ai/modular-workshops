@@ -1,0 +1,29 @@
+.gitignore
+  s_aa62c972738a52::t_759295f1f65b29 3-8
+langgraph.json
+  s_aa62c972738a52::t_0bd4f9ad06dcba 9-10
+  s_aa62c972738a52::t_e9791ffec9374b 5-8
+.dockerignore
+  s_aa62c972738a52::t_bbaf4b30bfccf9 1-4,11-12,14-17
+  s_aa62c972738a52::t_c0ed84b467ca8f 5-10,13
+pyproject.toml
+  s_aa62c972738a52::t_e32e04a7c90608 7
+uv.lock
+  s_aa62c972738a52::t_0bc6a58516b558 10-13,2247
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "e6928a945b4ecd64707f885016bb9863b5be667d",
+  "prompts": {},
+  "sessions": {
+    "s_aa62c972738a52": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9136a42c-8017-4473-97c7-d316001232b8",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Steffen Hausmann <steffen@langchain.dev>"
+    }
+  }
+}
