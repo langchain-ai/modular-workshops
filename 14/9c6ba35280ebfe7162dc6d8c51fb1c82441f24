@@ -1,0 +1,24 @@
+modules/04_langsmith.ipynb
+  s_2833b58f4b3ec0::t_6b4ead034c42e2 797,842-845,848-850,854-859,861,863,903-916,1065-1067,1073-1087,1124-1128,1131-1132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "149c6ba35280ebfe7162dc6d8c51fb1c82441f24",
+  "prompts": {},
+  "humans": {
+    "h_7cae82992be157": {
+      "author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_2833b58f4b3ec0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e99aad64-97d0-480d-a6c3-2cb73e1b92d5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  }
+}
