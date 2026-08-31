@@ -1,0 +1,133 @@
+utils/models.py
+  h_7cae82992be157 19,24-27
+  s_2833b58f4b3ec0::t_fe06ee3671ae5d 3-5,7-9,18,20,23,28-30,33-34,37-38,41-47
+.devcontainer/devcontainer.json
+  s_2833b58f4b3ec0::t_d839ca00149434 3
+.gitignore
+  s_2833b58f4b3ec0::t_e11aecc28e55df 42,45-46,56-59
+environment_evals/dataset/coffee-history-report/.gitignore
+  s_2833b58f4b3ec0::t_ce202a530d6306 1-23
+environment_evals/dataset/coffee-history-report/environment/Dockerfile
+  s_2833b58f4b3ec0::t_40c5400242b509 1-10
+environment_evals/dataset/coffee-history-report/environment/info/coffee_history.md
+  s_2833b58f4b3ec0::t_71d371082aa6d5 1-26
+environment_evals/dataset/coffee-history-report/environment/info/deep_sea_exploration.md
+  s_2833b58f4b3ec0::t_359c367c03a677 1-29
+environment_evals/dataset/coffee-history-report/environment/info/noise_pollution.md
+  s_2833b58f4b3ec0::t_b3f553ca6a86aa 1-28
+environment_evals/dataset/coffee-history-report/environment/info/urban_beekeeping.md
+  s_2833b58f4b3ec0::t_b8d1ea7aa15f3a 1-28
+environment_evals/dataset/coffee-history-report/instruction.md
+  s_2833b58f4b3ec0::t_a861685c98337f 1-10
+environment_evals/dataset/coffee-history-report/solution/solve.sh
+  s_2833b58f4b3ec0::t_c8c47e37abaaeb 1-32
+environment_evals/dataset/coffee-history-report/task.toml
+  s_2833b58f4b3ec0::t_08c41ce9287a32 1-32
+environment_evals/dataset/coffee-history-report/tests/test.sh
+  s_2833b58f4b3ec0::t_66927483d09c1a 1-5
+environment_evals/dataset/coffee-history-report/tests/verify.py
+  s_2833b58f4b3ec0::t_08c025221517f0 1-126
+environment_evals/dataset/deep-sea-report/.gitignore
+  s_2833b58f4b3ec0::t_6ea26c78fa13f9 1-23
+environment_evals/dataset/deep-sea-report/environment/Dockerfile
+  s_2833b58f4b3ec0::t_b9754accabba79 1-10
+environment_evals/dataset/deep-sea-report/environment/info/coffee_history.md
+  s_2833b58f4b3ec0::t_30722c1d45e303 1-26
+environment_evals/dataset/deep-sea-report/environment/info/deep_sea_exploration.md
+  s_2833b58f4b3ec0::t_e6be8e6a6ea0d3 1-29
+environment_evals/dataset/deep-sea-report/environment/info/noise_pollution.md
+  s_2833b58f4b3ec0::t_224ef78d78fc95 1-28
+environment_evals/dataset/deep-sea-report/environment/info/urban_beekeeping.md
+  s_2833b58f4b3ec0::t_858fb732ff86bd 1-28
+environment_evals/dataset/deep-sea-report/instruction.md
+  s_2833b58f4b3ec0::t_05c1aabaf4ae9d 1-10
+environment_evals/dataset/deep-sea-report/solution/solve.sh
+  s_2833b58f4b3ec0::t_963415f8a5d367 1-32
+environment_evals/dataset/deep-sea-report/task.toml
+  s_2833b58f4b3ec0::t_e9d70445ff2ff7 1-32
+environment_evals/dataset/deep-sea-report/tests/test.sh
+  s_2833b58f4b3ec0::t_0d0c71f00c2d29 1-5
+environment_evals/dataset/deep-sea-report/tests/verify.py
+  s_2833b58f4b3ec0::t_377c3a5b93998c 1-126
+environment_evals/dataset/noise-pollution-report/.gitignore
+  s_2833b58f4b3ec0::t_b8deb06e7b573c 1-23
+environment_evals/dataset/noise-pollution-report/environment/Dockerfile
+  s_2833b58f4b3ec0::t_bc15a4d5993e9c 1-10
+environment_evals/dataset/noise-pollution-report/environment/info/coffee_history.md
+  s_2833b58f4b3ec0::t_8310cc38f97a8d 1-26
+environment_evals/dataset/noise-pollution-report/environment/info/deep_sea_exploration.md
+  s_2833b58f4b3ec0::t_e5d900f6a8f6be 1-29
+environment_evals/dataset/noise-pollution-report/environment/info/noise_pollution.md
+  s_2833b58f4b3ec0::t_16a248fa54f1e0 1-28
+environment_evals/dataset/noise-pollution-report/environment/info/urban_beekeeping.md
+  s_2833b58f4b3ec0::t_6cd91f75248ec2 1-28
+environment_evals/dataset/noise-pollution-report/instruction.md
+  s_2833b58f4b3ec0::t_23e866e894ba38 1-10
+environment_evals/dataset/noise-pollution-report/solution/solve.sh
+  s_2833b58f4b3ec0::t_f635d8b5a3c6f6 1-32
+environment_evals/dataset/noise-pollution-report/task.toml
+  s_2833b58f4b3ec0::t_ee81c116c2d14f 1-32
+environment_evals/dataset/noise-pollution-report/tests/test.sh
+  s_2833b58f4b3ec0::t_a5806447a45b48 1-5
+environment_evals/dataset/noise-pollution-report/tests/verify.py
+  s_2833b58f4b3ec0::t_c4beca5ac5e003 1-126
+environment_evals/dataset/urban-beekeeping-report/.gitignore
+  s_2833b58f4b3ec0::t_27918979cb025a 1-23
+environment_evals/dataset/urban-beekeeping-report/environment/Dockerfile
+  s_2833b58f4b3ec0::t_6aa3b47675c8eb 1-10
+environment_evals/dataset/urban-beekeeping-report/environment/info/coffee_history.md
+  s_2833b58f4b3ec0::t_1dd56de39c0b0a 1-26
+environment_evals/dataset/urban-beekeeping-report/environment/info/deep_sea_exploration.md
+  s_2833b58f4b3ec0::t_6ec4c90c028cf6 1-29
+environment_evals/dataset/urban-beekeeping-report/environment/info/noise_pollution.md
+  s_2833b58f4b3ec0::t_0531f855b679af 1-28
+environment_evals/dataset/urban-beekeeping-report/environment/info/urban_beekeeping.md
+  s_2833b58f4b3ec0::t_1cf218f740396f 1-28
+environment_evals/dataset/urban-beekeeping-report/instruction.md
+  s_2833b58f4b3ec0::t_0a985876a71427 1-10
+environment_evals/dataset/urban-beekeeping-report/solution/solve.sh
+  s_2833b58f4b3ec0::t_2cd8073eab90c0 1-32
+environment_evals/dataset/urban-beekeeping-report/task.toml
+  s_2833b58f4b3ec0::t_9a9ed5e33dbca1 1-32
+environment_evals/dataset/urban-beekeeping-report/tests/test.sh
+  s_2833b58f4b3ec0::t_bcd49d52e429f7 1-5
+environment_evals/dataset/urban-beekeeping-report/tests/verify.py
+  s_2833b58f4b3ec0::t_b920d45fb647f9 1-126
+environment_evals/deep-agent/agent.py
+  s_2833b58f4b3ec0::t_f9f7f748c6e0a8 1-61
+environment_evals/deep-agent/langgraph.json
+  s_2833b58f4b3ec0::t_e812bf237cb1f5 1-9
+langgraph.json
+  s_2833b58f4b3ec0::t_0fe1b1df2461c0 2-4,9-10
+modules/03_deploy_and_govern.ipynb
+  s_2833b58f4b3ec0::t_e795a5193650a6 13-14,16,55,59,63,72,76-78,156,158,176,201-203,208-209,212,215-220,223,226,228,258,262,271,273,321,343,345,354,363,375,377,379,382-385,405,435
+modules/04_langsmith.ipynb
+  s_2833b58f4b3ec0::t_ba01bb817a885e 8,14-17,68,70,72-74,84,86-89,93,95,99,107,111-114,116,126,138,158,175,186,203,213,238,280,311-316,349,353-355,388-389,392-409,417,419,482,497,522,597,603-605,607,684-1116,1124,1175,1179,1241,1244,1290,1306-1307,1311,1313,1319,1333
+pyproject.toml
+  s_2833b58f4b3ec0::t_8a3ff571522dc3 5,31-40
+utils/harbor_utils.py
+  s_2833b58f4b3ec0::t_5415625f350961 1-33
+uv.lock
+  s_2833b58f4b3ec0::t_12ac5e4605cc22 3,7,141-149,693-716,744-759,769-818,932-940,1165-1261,1322-1326,1336-1364,1920,1956,2240-2282,2358-2366,2405-2409,2436-2438,2946-2960,3289-3293,3438-3451,3616-3628,3737-3749,3768-3785,3906-3929,3939-3984,4081-4116,4164-4178
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "a977b7904e904e9609f981f3734e16ed1e30c2dc",
+  "prompts": {},
+  "humans": {
+    "h_7cae82992be157": {
+      "author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_2833b58f4b3ec0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e99aad64-97d0-480d-a6c3-2cb73e1b92d5",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  }
+}
