@@ -39,9 +39,11 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# Editors
+# Editors / local agent config
 .idea/
 .vscode/
+.cursor/
+.claude/
 *.swp
 *.swo
 
@@ -51,3 +53,7 @@ Thumbs.db
 # Deep Agents SQLite long-term memory (notebook demo artifact)
 deep_agents_memory.db
 deep_agents_memory.db-*
+
+# Harbor (Module 4, Environment Evals) — local job output + scratch workspace
+jobs/
+.dev-workspace/

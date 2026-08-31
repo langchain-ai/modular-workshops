@@ -1,8 +1,11 @@
 {
-  "dependencies": ["."],
+  "dependencies": [
+    "."
+  ],
   "graphs": {
     "deep_agent": "./agents/deep_agent/agent.py:agent"
   },
   "env": ".env",
-  "image_distro": "wolfi"
+  "image_distro": "wolfi",
+  "python_version": "3.12"
 }
