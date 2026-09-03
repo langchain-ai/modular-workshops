@@ -1,0 +1,15 @@
+utils/models.py
+  h_2ce1fc5d409307 19,25
+  h_2ce1fc5d409307 24,26-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "6649428269a4a54dc93a0eefe850ac410643ed64",
+  "prompts": {},
+  "humans": {
+    "h_2ce1fc5d409307": {
+      "author": "haithamshahin333 <42976403+haithamshahin333@users.noreply.github.com>"
+    }
+  }
+}
