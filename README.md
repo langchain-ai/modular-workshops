@@ -28,7 +28,11 @@ cp .env.example .env
 | `TAVILY_API_KEY` | Modules 1 & 3 (web search tool) | <https://tavily.com> |
 
 ```bash
-# 3. Start Jupyter
+# 3. Point LangSmith's own features (Playground, Evaluators, Fleet, Chat, Insights) at
+#    the LLM Gateway. Run once per workspace; safe to re-run.
+uv run python scripts/setup_model_config.py
+
+# 4. Start Jupyter
 uv run jupyter notebook
 ```
 
@@ -80,6 +84,8 @@ modular-workshops/
 ├── pyproject.toml                  (shared dependencies)
 ├── .env.example
 ├── langgraph.json                  (registers agents/deep_agent for langgraph dev)
+├── scripts/
+│   └── setup_model_config.py       (one-shot: LangSmith model config → LLM Gateway)
 ├── utils/
 ├── agents/
 │   ├── research_agent.py           (shared agent factory — Module 1 references, Module 4 imports for eval)
