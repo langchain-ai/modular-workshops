@@ -33,7 +33,7 @@ dependencies = [
 # `uv pip install -e .`, which reads [project.dependencies] only -- so harbor's
 # tree stays out of an image that never uses it.
 [dependency-groups]
-harbor = ["harbor[langsmith]>=0.22.0"]
+harbor = ["harbor[langsmith]==0.22.0"]
 
 [tool.uv]
 default-groups = ["harbor"]

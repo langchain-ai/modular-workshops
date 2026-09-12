@@ -2434,7 +2434,7 @@ requires-dist = [
 ]
 
 [package.metadata.requires-dev]
-harbor = [{ name = "harbor", extras = ["langsmith"], specifier = ">=0.22.0" }]
+harbor = [{ name = "harbor", extras = ["langsmith"], specifier = "==0.22.0" }]
 
 [[package]]
 name = "multidict"

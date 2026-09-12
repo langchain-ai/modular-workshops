@@ -1,12 +1,8 @@
-"""Verifier for the research-report tasks -- topic-agnostic, identical across every task.
+"""Verifier shared by the four research-report tasks.
 
-Copied to /tests/verify.py and run by /tests/test.sh. The topic file is passed in via
-TOPIC_FILE (see [verifier.env] in task.toml), so this one file serves all four tasks.
-
-Seven checks, one combined reward. The first four inspect the report as text. The last
-three require *executing* the agent's own `sources.py`: the report is read, then deleted,
-then the script is re-run from a clean state and its fresh output compared against both
-the report's claim and the independently-derived truth.
+TOPIC_FILE selects the source file for the current task. Four checks cover report
+structure and citations, one checks the report's source count, and two rerun the
+agent's `sources.py`. The reward is the average of all seven checks.
 """
 
 import json
@@ -15,7 +11,7 @@ import pathlib
 import re
 import subprocess
 
-WORKDIR = pathlib.Path(os.environ.get("HARBOR_WORKDIR", "/app"))
+WORKDIR = pathlib.Path(os.environ.get("HARBOR_WORKDIR", "/app")).resolve()
 INFO = WORKDIR / "info"
 REPORT = WORKDIR / "report"
 TOPIC_FILE = os.environ.get("TOPIC_FILE", "")
@@ -26,8 +22,19 @@ def read(p):
     return p.read_text(encoding="utf-8", errors="replace")
 
 
+def resolve_under(root, child):
+    """Resolve child and reject paths outside root."""
+    root = root.resolve()
+    path = (root / child).resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as exc:
+        raise ValueError(f"Path escapes {root}: {child}") from exc
+    return path
+
+
 def report_files():
-    """Markdown files the agent wrote under report/, jailed to the working dir."""
+    """Return Markdown reports that resolve inside the working directory."""
     if not REPORT.is_dir():
         return []
     out = []
@@ -77,8 +84,7 @@ NUMBER_WORDS = {
 def states_count(text, n):
     """The report must state the count in a sentence that mentions sources.
 
-    Accepts the digit or the spelled-out word -- "cites five distinct sources" is a
-    correct answer, and the verifier shouldn't punish natural phrasing.
+    Accept the digit or its spelled-out form so formatting does not affect the score.
     """
     forms = [str(n)] + ([NUMBER_WORDS[n]] if n in NUMBER_WORDS else [])
     pattern = r"\b(" + "|".join(forms) + r")\b"
@@ -94,7 +100,8 @@ prose = read(files[0]) if files else ""
 body, sources = split_body_and_sources(prose)
 
 # Ground truth, derived independently of anything the agent produced.
-true_count = len(set(URL_RE.findall(read(INFO / TOPIC_FILE)))) if TOPIC_FILE else 0
+topic_path = resolve_under(INFO, TOPIC_FILE) if TOPIC_FILE else None
+true_count = len(set(URL_RE.findall(read(topic_path)))) if topic_path else 0
 
 s = {
     "report_written": float(bool(files)),
