@@ -1,0 +1,14 @@
+modules/01_deep_agents.ipynb
+  h_3026ca07fd9da6 31,98,103,105,108,126,138-139,142-144,151-152,155-156,160-162,165-167,1185
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "40c31513da61ce6cc98e95cdc56b2a5ca116d249",
+  "prompts": {},
+  "humans": {
+    "h_3026ca07fd9da6": {
+      "author": "Stephen Chu <stephen.chu@langchain.dev>"
+    }
+  }
+}

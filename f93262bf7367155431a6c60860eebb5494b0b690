@@ -1,0 +1,21 @@
+modules/03_deploy_and_govern.ipynb
+  s_aa62c972738a52::t_4e378f2a4d16ab 263-265,346,371-372,375
+modules/01_deep_agents.ipynb
+  s_aa62c972738a52::t_4e378f2a4d16ab 520-522
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "f93262bf7367155431a6c60860eebb5494b0b690",
+  "prompts": {},
+  "sessions": {
+    "s_aa62c972738a52": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9136a42c-8017-4473-97c7-d316001232b8",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Steffen Hausmann <steffen@langchain.dev>"
+    }
+  }
+}

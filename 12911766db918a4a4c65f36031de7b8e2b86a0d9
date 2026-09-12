@@ -1,0 +1,29 @@
+README.md
+  s_b0f0b0ad13eb07::t_4823cb16833256 31-35
+  s_b0f0b0ad13eb07::t_4af30e8e199665 87-88
+scripts/setup_model_config.py
+  s_b0f0b0ad13eb07::t_28bcff93ad566b 1-42,46-68,79-133,135-142,144-151,153-167,169-183,185-192,194-204,209-210,212-216,225-230,232-282
+  s_b0f0b0ad13eb07::t_5402c0ea0257f9 43-45,205-208,217-224
+  s_b0f0b0ad13eb07::t_5206530713181b 69-78,134,143,152,168,184,193,211,231
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "12911766db918a4a4c65f36031de7b8e2b86a0d9",
+  "prompts": {},
+  "humans": {
+    "h_2ce1fc5d409307": {
+      "author": "haithamshahin333 <42976403+haithamshahin333@users.noreply.github.com>"
+    }
+  },
+  "sessions": {
+    "s_b0f0b0ad13eb07": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "edb18241-0ddd-420f-a931-93afad7884a4",
+        "model": "claude-opus-5"
+      },
+      "human_author": "haithamshahin333 <42976403+haithamshahin333@users.noreply.github.com>"
+    }
+  }
+}

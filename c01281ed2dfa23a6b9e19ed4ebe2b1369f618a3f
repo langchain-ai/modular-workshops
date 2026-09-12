@@ -1,0 +1,24 @@
+modules/04_langsmith.ipynb
+  s_c9b14cede58a4b::t_4d34e9f4e2d8ce 15,875
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "c01281ed2dfa23a6b9e19ed4ebe2b1369f618a3f",
+  "prompts": {},
+  "humans": {
+    "h_3026ca07fd9da6": {
+      "author": "Stephen Chu <stephen.chu@langchain.dev>"
+    }
+  },
+  "sessions": {
+    "s_c9b14cede58a4b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fcd52-64e5-7f41-9b08-2c52239ceeb0",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Stephen Chu <stephen.chu@langchain.dev>"
+    }
+  }
+}

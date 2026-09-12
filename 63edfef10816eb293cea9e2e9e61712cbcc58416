@@ -1,0 +1,26 @@
+utils/langsmith_rules.py
+  s_b6151ffbe3a7f3::t_f2e29e75986b57 71-85,93
+  s_b6151ffbe3a7f3::t_73f701384a3e77 17
+modules/04_langsmith.ipynb
+  s_b6151ffbe3a7f3::t_e562be557763c2 7-22,234-242,792,795-813,867-882,887,901
+modules/01_deep_agents.ipynb
+  s_b6151ffbe3a7f3::t_9af2927db05119 31,33,90,92,106,108,122,124,167,169,181,183,217,219,251,253,272,274,300,302,331,333,384,386,425,427,487,489,517,519,544,546,617,619,658,660,744
+modules/03_deploy_and_govern.ipynb
+  s_b6151ffbe3a7f3::t_36ef657ecbd6db 447
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.20",
+  "base_commit_sha": "63edfef10816eb293cea9e2e9e61712cbcc58416",
+  "prompts": {},
+  "sessions": {
+    "s_b6151ffbe3a7f3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0bdf5181-2e52-4817-b541-8ae7914c9f27",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Steffen Hausmann <steffen@langchain.dev>"
+    }
+  }
+}

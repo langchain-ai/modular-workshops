@@ -1,0 +1,24 @@
+docs/testing-codespaces.md
+  s_22eff85b58915d::t_f0d7c7c9ce892f 1-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.21",
+  "base_commit_sha": "a419e4da68aa87627b5b2b70fd03b8b9d9c838b1",
+  "prompts": {},
+  "humans": {
+    "h_3026ca07fd9da6": {
+      "author": "Stephen Chu <stephen.chu@langchain.dev>"
+    }
+  },
+  "sessions": {
+    "s_22eff85b58915d": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019fdea2-1ac1-7793-b647-54b69c97b9ac",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Stephen Chu <stephen.chu@langchain.dev>"
+    }
+  }
+}

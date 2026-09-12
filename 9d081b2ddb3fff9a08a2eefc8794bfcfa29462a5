@@ -1,0 +1,19 @@
+utils/models.py
+  s_abce19ce3faba7::t_e8764daf6897f4 18,31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.12",
+  "base_commit_sha": "9d081b2ddb3fff9a08a2eefc8794bfcfa29462a5",
+  "prompts": {},
+  "sessions": {
+    "s_abce19ce3faba7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019f4ea9-d6d1-7c53-8a81-424160a73062",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Stephen Chu <stephen.chu@langchain.dev>"
+    }
+  }
+}

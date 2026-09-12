@@ -1,0 +1,19 @@
+agents/deep_agent/agent.py
+  s_aa62c972738a52::t_a013ffa4dd6c06 61-63
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.18",
+  "base_commit_sha": "f9e26eb5b87982dc115b4776e7d70558384c9964",
+  "prompts": {},
+  "sessions": {
+    "s_aa62c972738a52": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9136a42c-8017-4473-97c7-d316001232b8",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Steffen Hausmann <steffen@langchain.dev>"
+    }
+  }
+}
