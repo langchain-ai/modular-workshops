@@ -2,7 +2,7 @@
 name = "modular-workshops"
 version = "0.1.0"
 description = "Mix-and-match LangChain workshop modules for ~1.5 hour customer workshops"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "deepagents>=0.7",
     "deepagents-cli",
@@ -27,6 +27,16 @@ dependencies = [
     "tavily-python>=0.7.21",
     "langchain-core>=1.5.3",
 ]
+
+# Harbor (Module 4, Environment Evals) is a dependency *group*, not a project
+# dependency: `uv sync` installs it, but the LangGraph deploy image builds with
+# `uv pip install -e .`, which reads [project.dependencies] only -- so harbor's
+# tree stays out of an image that never uses it.
+[dependency-groups]
+harbor = ["harbor[langsmith]==0.22.0"]
+
+[tool.uv]
+default-groups = ["harbor"]
 
 [tool.setuptools]
 packages = ["agents", "utils"]

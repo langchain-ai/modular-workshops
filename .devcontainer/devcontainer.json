@@ -1,6 +1,6 @@
 {
   "name": "modular-workshops",
-  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "image": "mcr.microsoft.com/devcontainers/python:3.12",
   "postCreateCommand": "bash .devcontainer/setup.sh",
   "customizations": {
     "vscode": {

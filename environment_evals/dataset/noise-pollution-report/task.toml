@@ -1,0 +1,32 @@
+schema_version = "1.4"
+artifacts = []
+
+[task]
+name = "workshop/noise-pollution-report"
+version = "1.0.0"
+description = "Write a 3-paragraph sourced report from a local markdown knowledge base"
+authors = []
+keywords = []
+
+[metadata]
+
+[verifier]
+timeout_sec = 300.0
+collect = []
+
+[verifier.env]
+TOPIC_FILE = "noise_pollution.md"
+
+[agent]
+timeout_sec = 300.0
+
+[environment]
+network_mode = "public"
+build_timeout_sec = 600.0
+os = "linux"
+mcp_servers = []
+
+[environment.env]
+
+[solution.env]
+TOPIC_FILE = "noise_pollution.md"
