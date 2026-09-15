@@ -2,9 +2,13 @@
 
 import os
 import sqlite3
-import requests
+from pathlib import Path
+
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
+
+
+CHINOOK_DB_PATH = Path(__file__).resolve().parents[1] / "data" / "chinook.db"
 
 
 def clear_local_env_vars():
@@ -33,16 +37,18 @@ def show_graph(graph, xray=False):
 
 
 def get_engine_for_chinook_db():
-    """Download the Chinook SQL script and load it into an in-memory SQLite DB."""
-    url = "https://raw.githubusercontent.com/lerocha/chinook-database/master/ChinookDatabase/DataSources/Chinook_Sqlite.sql"
-    response = requests.get(url)
-    sql_script = response.text
+    """Open the bundled Chinook database through a read-only SQLite connection."""
+    if not CHINOOK_DB_PATH.is_file():
+        raise FileNotFoundError(
+            f"Bundled Chinook database not found at {CHINOOK_DB_PATH}"
+        )
 
-    connection = sqlite3.connect(":memory:", check_same_thread=False)
-    connection.executescript(sql_script)
+    def connect_read_only():
+        database_uri = f"file:{CHINOOK_DB_PATH.as_posix()}?mode=ro"
+        return sqlite3.connect(database_uri, uri=True, check_same_thread=False)
+
     return create_engine(
         "sqlite://",
-        creator=lambda: connection,
+        creator=connect_read_only,
         poolclass=StaticPool,
-        connect_args={"check_same_thread": False},
     )

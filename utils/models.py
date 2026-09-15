@@ -37,11 +37,27 @@ API_KEY_ENV = "OPENAI_API_KEY"
 # MODEL_SPEC = {"model": "azure_openai:gpt-5.6-terra", "azure_deployment": "gpt-5.6-terra"}
 # API_KEY_ENV = "AZURE_OPENAI_API_KEY"
 
+# --- Google Vertex AI ---
+# Authenticates through Application Default Credentials (ADC), so no API key is
+# passed to the model. For local development, configure ADC with:
+#     gcloud auth application-default login
+# MODEL_SPEC = {
+#     "model": os.getenv("VERTEX_AI_MODEL", "gemini-2.5-flash"),
+#     "model_provider": "google_vertexai",
+#     "project": os.environ["GCP_PROJECT_ID"],
+#     "location": os.getenv("GCP_REGION", "us-central1"),
+#     "temperature": float(os.getenv("VERTEX_AI_TEMPERATURE", "0.0")),
+#     "thinking_budget": int(os.getenv("THINKING_BUDGET", "-1")),
+#     "include_thoughts": os.getenv("INCLUDE_THOUGHTS", "true").lower() == "true",
+# }
+# if max_output_tokens := os.getenv("MAX_OUTPUT_TOKENS"):
+#     MODEL_SPEC["max_tokens"] = int(max_output_tokens)
+# API_KEY_ENV = None
+
 # --- AWS Bedrock ---
-# Bedrock authenticates via the AWS credential chain, not a single key. Uncomment
-# these two lines *and* replace the `model = ...` line below with:
-#     model = init_chat_model(**MODEL_SPEC)
+# Bedrock authenticates via the AWS credential chain, not a single key.
 # MODEL_SPEC = {"model": "bedrock_converse:anthropic.claude-sonnet-4-20250514-v1:0"}
 # API_KEY_ENV = None
 
-model = init_chat_model(**MODEL_SPEC, api_key=os.environ[API_KEY_ENV])
+model_kwargs = {"api_key": os.environ[API_KEY_ENV]} if API_KEY_ENV else {}
+model = init_chat_model(**MODEL_SPEC, **model_kwargs)
