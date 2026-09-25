@@ -1,0 +1,24 @@
+{
+  "TASK-001": {
+    "title": "Overdue list includes completed tasks and tasks due today",
+    "description": "The overdue list should show unfinished work from before the supplied date. Users currently see work they finished and work that is not due until today.",
+    "acceptance_criteria": [
+      "Include an unfinished task only when its due date is strictly before today.",
+      "Exclude completed tasks, even when their due date is in the past.",
+      "Exclude tasks due today or in the future.",
+      "Keep the input task list and task dictionaries unchanged.",
+      "Run the regression tests and report the observed result."
+    ]
+  },
+  "TASK-002": {
+    "title": "Show the oldest overdue task first",
+    "description": "The overdue list needs a predictable order. TASK-001's tests check membership, but do not check order.",
+    "acceptance_criteria": [
+      "Retain every TASK-001 filtering requirement.",
+      "Return overdue tasks in ascending due-date order, even when the input is unsorted.",
+      "Preserve input order for tasks with equal due dates.",
+      "Do not reorder or mutate the input list.",
+      "Add a regression test using overdue tasks supplied in the wrong order, and report its observed result."
+    ]
+  }
+}
