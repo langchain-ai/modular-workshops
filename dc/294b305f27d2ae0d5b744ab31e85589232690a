@@ -1,0 +1,132 @@
+.env.example
+  s_76881090a1a706::t_8941ec455c8417 32
+  s_76881090a1a706::t_7af9f0e7e6e260 30-31
+utils/coding_agent_workshop/tests/test_module06.py
+  s_76881090a1a706::t_f90c5fc4bd96ef 1-511,524-526
+  s_76881090a1a706::t_692e94858028ff 512-522
+  s_76881090a1a706::t_5a69ae8fdd2837 523
+modules/06_coding_agent_analytics.ipynb
+  s_76881090a1a706::t_eef755d65b008d 299,302
+  s_76881090a1a706::t_1946bd275c7d27 1-7,9-11,13,19,21-29,31,33-35,38,40-48,50,52,62-86,88-97,99-100,103-105,109-117,119,121,123-132,134-145,150-158,160-162,164,166-187,191,193-201,205,207-241,243,245-267,269,271-281,283-285,287-298,300-301,303,305-316,318,320,322-350,352,354,360,364-372,374,376-444,446,448,450-458,461-470,472,474-533,535,537-582,584,586-640,642,644-712,714,716-726,728-738,740-750,752-754,756-766,768-778,780,782-790,792,794,799,801-810,812-836,838,840-865,867,869-877,880-924,926,928,930-938,941-942,953-973,976-985,988-997,999,1001-1021,1023,1025-1035,1039-1051,1053-1062,1064,1066,1068-1076,1081-1087,1089-1091,1099-1106,1109,1111,1113-1149
+  s_76881090a1a706::t_12b15b44baa24f 270
+  s_76881090a1a706::t_6a9b0116254d02 8,12,14-18,20,32,36-37,39,49,51,53-57,59,61,118,120,122,159,163,188-190,192,242,244,268,317,319,321,351,353,355-359,363,373,375,445,447,471,473,534,536,583,585,641,643,713,715,727,739,751,755,779,781,791,793,795-798,800,837,839,866,868,925,927,1000,1022,1024,1063,1067,1077-1080,1088,1092-1098,1110,1112
+  s_76881090a1a706::t_db89eef6decf0e 459-460
+  s_76881090a1a706::t_309e7f73668b50 974-975
+  s_76881090a1a706::t_2b381a5512a186 986
+  s_76881090a1a706::t_adbffd1404eef2 878-879,945-952
+  s_76881090a1a706::t_b9d8c35ec33a32 987,998
+  s_76881090a1a706::t_2d69126a255a00 361-362,929,1107-1108
+  s_76881090a1a706::t_a19eccdc0aa28f 939-940,943
+  s_76881090a1a706::t_758c3ab8cc9cd7 1065
+  s_76881090a1a706::t_f90c5fc4bd96ef 30,133,165,449
+  s_76881090a1a706::t_afdef5832ec364 58,60,87,98,101-102,106-108,146-149,202-204,206,282,286,304,767,811,944,1036-1038,1052
+utils/coding_agent_analytics.py
+  s_76881090a1a706::t_ac3192f8eb1f1b 295-297,299-317,404-413,415,436,451,454-456
+  s_76881090a1a706::t_692e94858028ff 469-472
+  s_76881090a1a706::t_5abbd8a3f5b25e 1-77,79-84,86-105,115-154,159-238,242-294,298,318-366,372-402,426-431,433-435,437-441,443-449,452-453,457-464,476-479,484-487
+  s_76881090a1a706::t_f90c5fc4bd96ef 78,85
+  s_76881090a1a706::t_504f4bf7a43b6b 106-114,239-240,370,417,475,480-483
+  s_76881090a1a706::t_31704260778f79 155-158
+  s_76881090a1a706::t_8106767e4e4e4b 241
+  s_76881090a1a706::t_f502a0a2f27c87 367-369
+  s_76881090a1a706::t_7f43c91d97da46 371
+  s_76881090a1a706::t_667ac1195fa9e3 403
+  s_76881090a1a706::t_2ad036bd02c26b 414
+  s_76881090a1a706::t_182b8810f53b75 416
+  s_76881090a1a706::t_aa11f5ebd973d4 418-420,423-425
+  s_76881090a1a706::t_fd2053b3de56e8 432
+  s_76881090a1a706::t_d959c86b49a579 442
+  s_76881090a1a706::t_5c5ade1280446b 450
+  s_76881090a1a706::t_52fbf7953db7cf 465-468
+  s_76881090a1a706::t_13b4dafc6f5118 473-474
+  s_3213cc2c69207e::t_7a8a076e1e3127 421-422
+README.md
+  s_76881090a1a706::t_8941ec455c8417 75-78,80,104-106
+  s_76881090a1a706::t_f90c5fc4bd96ef 79,90
+  s_76881090a1a706::t_8d1fbf0eca7535 39
+utils/coding_agent_workshop/README.md
+  s_76881090a1a706::t_82063fe2a97ca2 46,94-95,97
+  s_76881090a1a706::t_2d69126a255a00 76
+  s_76881090a1a706::t_f90c5fc4bd96ef 1-45,47-75,77-93,96,98-100
+utils/langsmith_rules.py
+  s_76881090a1a706::t_504f4bf7a43b6b 25-28,53-54,80-81,116-117,136,207-260,262,270-271
+  s_76881090a1a706::t_079033aef53c53 264-265,277-284,287-329
+  s_76881090a1a706::t_b16aa4be33230b 83-87,89,261,263,266-269,272-276,285-286,330-332
+utils/models.py
+  h_7cae82992be157 19-20
+  s_76881090a1a706::t_09afedf3a0d892 25-30
+utils/launch_claude.py
+  s_76881090a1a706::t_e7a0789cb7b918 13-32,38,54-55
+  s_76881090a1a706::t_727c5acb751e8d 4,56-59,61
+  s_76881090a1a706::t_504f4bf7a43b6b 1-3,5-12,33-37,39-53,62-81
+  s_76881090a1a706::t_2930d24ea013da 60
+utils/coding_agent_workshop/plugin/.claude-plugin/plugin.json
+  s_e56b0663516407::t_7093fbdb5e9e7f 1-5
+utils/coding_agent_workshop/plugin/.mcp.json
+  s_e56b0663516407::t_d7ea3516ee3adb 1-8
+utils/coding_agent_workshop/plugin/fixtures/issues.json
+  s_e56b0663516407::t_87ba0a05261f20 1-24
+utils/coding_agent_workshop/plugin/server.py
+  s_727d40d9d2b17c::t_48bd7f1165fc59 1-91
+utils/coding_agent_workshop/plugin/skills/fix-bug/SKILL.md
+  s_e56b0663516407::t_5bd70bbbcb29b8 1-14
+utils/coding_agent_workshop/plugin/skills/review-change/SKILL.md
+  s_e56b0663516407::t_74202720ec4ec7 1-13
+utils/coding_agent_workshop/sample_repo/README.md
+  s_e56b0663516407::t_35736720a9ee08 1-21
+utils/coding_agent_workshop/sample_repo/tasks.json
+  s_e56b0663516407::t_86b9e538ade935 1-6
+utils/coding_agent_workshop/sample_repo/test_tracker.py
+  s_e56b0663516407::t_c8400fa834f6f9 1-30
+utils/coding_agent_workshop/sample_repo/tracker.py
+  s_e56b0663516407::t_069faf6265c93f 1-25
+utils/coding_agent_workshop/solutions/tracker.py
+  s_e56b0663516407::t_d10078a20d7dd2 1-28
+.gitignore
+  s_3213cc2c69207e::t_b006cc66ffc951 53-55
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "dc294b305f27d2ae0d5b744ab31e85589232690a",
+  "prompts": {},
+  "humans": {
+    "h_7cae82992be157": {
+      "author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_3213cc2c69207e": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d0f1-2661-7283-b961-7f0b413a4f6b",
+        "model": "unknown"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    },
+    "s_727d40d9d2b17c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d0e0-d3a1-7180-b852-fab674dab55c",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    },
+    "s_76881090a1a706": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d0f1-25ea-7f12-891e-209179a303b0",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    },
+    "s_e56b0663516407": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d0be-62c5-72f2-85a7-a983898dea11",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  }
+}
