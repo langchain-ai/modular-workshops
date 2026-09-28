@@ -1,0 +1,68 @@
+README.md
+  s_76881090a1a706::t_e8f976b3d18b99 26,31-34,80
+  s_76881090a1a706::t_eb07dcf50bce41 9,82
+utils/coding_agent_workshop/fixtures/README.md
+  s_76881090a1a706::t_f6253f9671d8e3 1-17
+utils/coding_agent_workshop/tests/test_replay.py
+  s_76881090a1a706::t_f304c4499aafd7 1-108
+utils/coding_agent_replay.py
+  s_76881090a1a706::t_654f6135dc8e6e 1-146,152-166
+  s_76881090a1a706::t_578048fb917c06 147-151
+utils/coding_agent_workshop/tests/test_module06.py
+  s_76881090a1a706::t_303b5931627ebc 53-75
+  s_76881090a1a706::t_437a1837d7b881 93,235
+  s_76881090a1a706::t_3305a2e5882e9a 7-8,25,92,95-98,100,104-105,232,234,236-237,330-336,339-345,506
+utils/coding_agent_workshop/fixtures/recorded_session.json
+  s_76881090a1a706::t_39bab56a994b76 1-8113
+utils/langsmith_rules.py
+  s_76881090a1a706::t_10185b4b9ac85c 18,211-239,241-245,247-255,257-272,275,278,288,303,321-323,348-364,366-367,369-370,375-382
+  s_76881090a1a706::t_a4cac0a0385805 24,287,365,368,371-374
+  s_76881090a1a706::t_578048fb917c06 240,246,256
+.gitignore
+  s_76881090a1a706::t_654f6135dc8e6e 55
+modules/06_coding_agent_analytics.ipynb
+  s_76881090a1a706::t_bbe91cd4190e06 1064-1066
+  s_76881090a1a706::t_1c9cbbed4ef9e2 240,536-538
+  s_76881090a1a706::t_bba12597f73ada 30,32-36,38-40,42,58-60,62,74,88,93-122,130-133,137,167-171,182-185,211-213,215,219-239,241-244,266,269-271,284,320,322,332,334,344,346,349-352,363-373,383,385,387,397,399-401,404,482,497-503,513,515-517,527-535,596-603,647-654,707-714,737-738,770-777,787-798,853-892,901-903,931,946,948,985,1024,1099-1105,1126-1130,1239,1264-1267
+utils/coding_agent_workshop/tests/test_bms_configuration.py
+  s_76881090a1a706::t_f304c4499aafd7 55-71,123-143
+  s_76881090a1a706::t_77b043c19e91c1 1-54,72-122,144-170
+utils/coding_agent_workshop/README.md
+  s_76881090a1a706::t_303b5931627ebc 39-40
+  s_76881090a1a706::t_50ae43bfc55ead 128
+  s_76881090a1a706::t_f6253f9671d8e3 3,7-18,26,28-31,33,37-38,41-54,56,58-62,64-70,74-81,83,85,87,89,91,93,95,97-99,101,103,105,107-109,111,113,117-127,129-130
+pyproject.toml
+  s_76881090a1a706::t_654f6135dc8e6e 22
+utils/coding_agent_analytics.py
+  s_76881090a1a706::t_10185b4b9ac85c 10,47-49,55-67
+  s_76881090a1a706::t_a4cac0a0385805 17,34,88-99,171,181-191,201,230,232-238,331-332,337
+  s_76881090a1a706::t_437a1837d7b881 5,192-200,215-222
+  s_76881090a1a706::t_84eabf413db7f1 288-299
+  s_76881090a1a706::t_50ae43bfc55ead 526-534
+  s_76881090a1a706::t_61ff8490ce194a 68-69,202-214,223-229,241-242,416
+.env.example
+  s_76881090a1a706::t_e8f976b3d18b99 20-24,37-39
+uv.lock
+  s_76881090a1a706::t_d1adaaa60d3525 2428
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "59222af8d83a25d895df2e2d225b0f908e53628b",
+  "prompts": {},
+  "humans": {
+    "h_7cae82992be157": {
+      "author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_76881090a1a706": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d0f1-25ea-7f12-891e-209179a303b0",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  }
+}
