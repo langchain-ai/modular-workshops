@@ -2425,7 +2425,7 @@ requires-dist = [
     { name = "langgraph", specifier = ">=1.2.10" },
     { name = "langgraph-checkpoint-sqlite", specifier = ">=3.1.0" },
     { name = "langgraph-cli", extras = ["inmem"], specifier = ">=0.4.21" },
-    { name = "langsmith", specifier = ">=0.10.13" },
+    { name = "langsmith", specifier = ">=0.10.15" },
     { name = "notebook", specifier = ">=7.4.7" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "requests", specifier = ">=2.32.5" },

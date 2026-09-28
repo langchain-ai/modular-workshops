@@ -4,6 +4,8 @@ Trace fixtures below are synthetic contracts based on the official tracing
 plugin's serializer, not captured user sessions. The live rehearsal is separate.
 """
 
+import ast
+import asyncio
 import copy
 import importlib.util
 import io
@@ -20,7 +22,7 @@ from datetime import date, datetime, timezone
 from contextlib import redirect_stdout
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
@@ -48,6 +50,29 @@ def skill_call(name, call_id="a"):
 
 
 class ConfigurationTests(unittest.TestCase):
+    def test_prepared_checkpoint_skips_all_persistent_setup_and_cleanup(self):
+        notebook = json.loads((ROOT / "modules/06_coding_agent_analytics.ipynb").read_text())
+        cells = {cell["id"]: "".join(cell["source"]) for cell in notebook["cells"]}
+        project = SimpleNamespace(id="prepared", tenant_id="workspace")
+        client = Mock()
+        client.read_project.return_value = project
+        helpers = Mock()
+        helpers.project_url.return_value = "https://example.test/project"
+        namespace = {"activity_source": "prepared", "project_name": "presenter", "client": client,
+                     "analytics": helpers, "rules": Mock(), "web_url": "https://example.test", "os": os,
+                     "plugin_root": ROOT, "root": {}, "replay": Mock()}
+        with redirect_stdout(io.StringIO()):
+            for cell_id in ("m06-06", "m06-07", "m06-09", "m06-replay-smoke", "m06-25", "m06-27",
+                            "m06-31", "m06-34", "m06-38", "m06-40", "m06-42", "m06-replay-usage",
+                            "m06-61", "m06-63", "m06-73"):
+                result = eval(compile(cells[cell_id], cell_id, "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT), namespace)
+                if asyncio.iscoroutine(result):
+                    asyncio.run(result)
+        self.assertEqual(len(client.mock_calls), 1)
+        self.assertEqual(len(helpers.mock_calls), 1)
+        self.assertFalse(namespace["rules"].mock_calls)
+        self.assertFalse(namespace["replay"].mock_calls)
+
     def test_notebook_reuses_existing_settings_from_both_working_directories(self):
         notebook = json.loads((ROOT / "modules/06_coding_agent_analytics.ipynb").read_text())
         cells = {cell["id"]: "".join(cell["source"]) for cell in notebook["cells"]}
@@ -64,17 +89,20 @@ class ConfigurationTests(unittest.TestCase):
                         patch.dict(os.environ, selected_env, clear=True), \
                         patch("pathlib.Path.cwd", return_value=directory), \
                         patch("dotenv.load_dotenv") as load, patch("langsmith.Client") as client, \
-                        patch.object(analytics, "show_runs"), redirect_stdout(io.StringIO()) as output:
+                        patch.object(analytics, "show_runs"), patch.object(analytics, "query_turns", new_callable=AsyncMock) as query, \
+                        patch("getpass.getuser", return_value="attendee"), redirect_stdout(io.StringIO()) as output:
                     namespace = {"project": SimpleNamespace(id="project")}
-                    for cell_id in ("m06-03", "m06-04", "m06-11", "m06-27"):
-                        exec(compile(cells[cell_id], cell_id, "exec"), namespace)
+                    for cell_id in ("m06-03", "m06-mode", "m06-04", "m06-11", "m06-27"):
+                        result = eval(compile(cells[cell_id], cell_id, "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT), namespace)
+                        if asyncio.iscoroutine(result):
+                            asyncio.run(result)
                     load.assert_called_once_with(ROOT / ".env", override=True)
-                    self.assertEqual(namespace["project_name"], "existing-workshop")
+                    self.assertEqual(namespace["project_name"], "existing-workshop-attendee")
                     self.assertEqual(namespace["chart_format"], "v2")
                     self.assertEqual(client.call_args.kwargs["workspace_id"], standard_workspace or "existing-workspace")
                     self.assertEqual(namespace["judge_model"], rules.judge_model_config(api_key_env="OPENAI_API_KEY"))
-                    query = client.return_value.list_runs.call_args.kwargs
-                    self.assertEqual(query["filter"], namespace["agent_filter"])
+                    query_args = query.call_args.kwargs
+                    self.assertEqual(query_args["filter"], namespace["agent_filter"])
                     self.assertIn("claude-code", namespace["root_filter"])
                     self.assertNotIn(env["LANGSMITH_API_KEY"], output.getvalue())
 
@@ -201,11 +229,12 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_trace_loader_propagates_shared_project_scope(self):
         root = SimpleNamespace(id="root", end_time=datetime.now(timezone.utc))
-        client = SimpleNamespace(list_runs=Mock(return_value=[root]))
+        client = SimpleNamespace()
         agent_filter = 'and(eq(metadata_key, "ls_integration"), eq(metadata_value, "claude-code"))'
-        with patch.object(analytics, "read_trace", return_value=[root]), redirect_stdout(io.StringIO()):
-            analytics.load_traces(client, "shared-project", datetime.now(timezone.utc), filter=agent_filter)
-        self.assertEqual(client.list_runs.call_args.kwargs["filter"], agent_filter)
+        with patch.object(analytics, "read_trace", return_value=[root]), \
+                patch.object(analytics, "query_turns", return_value=[root]) as query, redirect_stdout(io.StringIO()):
+            asyncio.run(analytics.load_traces(client, "shared-project", datetime.now(timezone.utc), filter=agent_filter))
+        self.assertEqual(query.call_args.kwargs["filter"], agent_filter)
 
     def test_existing_project_thread_settings_are_reused(self):
         root = {"inputs": {"messages": []}, "outputs": {"messages": []},
@@ -298,17 +327,22 @@ class MetricsTests(unittest.TestCase):
         ])
 
     def test_trace_limit_is_an_error_not_a_partial_count(self):
-        client = SimpleNamespace(list_runs=lambda **kwargs: [{"id": str(i)} for i in range(4)])
-        with self.assertRaisesRegex(ValueError, "exceeds"):
-            analytics.read_trace(client, "project", {"id": "0", "trace_id": "0"}, max_runs=3)
+        async def rows(**kwargs):
+            for index in range(4):
+                yield {"id": str(index)}
+        client = SimpleNamespace(runs=SimpleNamespace(query=rows))
+        root = {"id": "0", "trace_id": "0", "start_time": datetime.now(timezone.utc)}
+        with self.assertRaisesRegex(ValueError, "More than"):
+            asyncio.run(analytics.read_trace(client, SimpleNamespace(id="project"), root, max_runs=3))
 
     def test_trace_can_exceed_the_servers_page_size(self):
-        def query(**kwargs):
-            if kwargs.get("limit", 100) > 100:
-                raise ValueError("Server page limit is 100")
-            return iter({"id": str(i)} for i in range(101))
-        client = SimpleNamespace(list_runs=query)
-        runs = analytics.read_trace(client, "project", {"id": "0", "trace_id": "0"}, max_runs=120)
+        async def rows(**kwargs):
+            self.assertEqual(kwargs["page_size"], 100)
+            for index in range(101):
+                yield {"id": str(index)}
+        client = SimpleNamespace(runs=SimpleNamespace(query=rows))
+        root = {"id": "0", "trace_id": "0", "start_time": datetime.now(timezone.utc)}
+        runs = asyncio.run(analytics.read_trace(client, SimpleNamespace(id="project"), root, max_runs=120))
         self.assertEqual(len(runs), 101)
 
 
@@ -469,7 +503,7 @@ class ProvisioningTests(unittest.TestCase):
 
     def test_invocation_chart_uses_the_analyzed_trace_population(self):
         notebook = json.loads((ROOT / "modules/06_coding_agent_analytics.ipynb").read_text())
-        source = "".join(notebook["cells"][60]["source"])
+        source = "".join(next(cell["source"] for cell in notebook["cells"] if cell["id"] == "m06-60"))
         namespace = {"json": json, "analytics": analytics, "traces": {"root-b": [], "root-a": []},
                      "cohorts": [{"name": "fix", "filter": 'in(id, ["root-a", "root-b"])'}]}
         exec(compile(source, "m06-60", "exec"), namespace)

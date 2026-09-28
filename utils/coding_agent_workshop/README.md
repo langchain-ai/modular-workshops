@@ -1,12 +1,21 @@
 # Module 6 pre-work and presenter guide
 
-Open [`06_coding_agent_analytics.ipynb`](../../modules/06_coding_agent_analytics.ipynb) for the participant walkthrough.
+Open [`06_coding_agent_analytics.ipynb`](../../modules/06_coding_agent_analytics.ipynb). It stands alone; Module 4 is an optional reference.
 
 ## Participant pre-work
 
-1. Clone this repository and follow its normal Python/Jupyter setup. Module 6's sample app and local MCP use only the standard library; there are no additional packages to install.
-2. Install and authenticate [Claude Code](https://code.claude.com/docs/en/setup). Confirm that a short prompt works before the workshop.
-3. Install the official [LangSmith tracing plugin](https://docs.langchain.com/langsmith/trace-claude-code). Inside Claude Code, use the current documented commands:
+1. Clone this repository. From its root, run:
+
+   ```bash
+   uv sync
+   uv run python -m ipykernel install --user --name=venv --display-name "Python (modular-workshop)"
+   uv run jupyter notebook
+   ```
+
+   Select **Python (modular-workshop)**. Python 3.12+ is required. `uv sync` creates `.venv` and installs the shared dependencies, including LangSmith SDK 0.10.15 or later. The sample app and local MCP use only the standard library.
+
+2. Install and authenticate [Claude Code](https://code.claude.com/docs/en/setup). Confirm a short prompt works.
+3. Install the official [LangSmith tracing plugin](https://docs.langchain.com/langsmith/trace-claude-code). Inside Claude Code:
 
    ```text
    /plugin marketplace add langchain-ai/langsmith-claude-code-plugins
@@ -14,87 +23,108 @@ Open [`06_coding_agent_analytics.ipynb`](../../modules/06_coding_agent_analytics
    /reload-plugins
    ```
 
-   If the plugin is already installed under an older marketplace alias, check `/plugin` instead of installing a duplicate.
+   If it is already installed under an older marketplace alias, check `/plugin` before installing a duplicate.
 
-4. Reuse the root `.env` from the other modules: `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT`, `LANGSMITH_PROJECT`, and `WORKSPACE_ID`. A standard `LANGSMITH_WORKSPACE_ID`, if set, takes precedence over `WORKSPACE_ID`. For self-hosted UI links, also set `LANGSMITH_WEB_URL`. Never paste a key into a notebook cell.
-5. Run the notebook's setup cells, then copy its launch command into a terminal. The launcher loads the same root `.env`, applies the notebook's selected endpoint/project/workspace, and starts Claude Code in the sample copy. Credentials stay in the process environment. If you use only shell-provided credentials, launch Jupyter and Claude Code from shells with that configuration.
-   The notebook defaults `chart_format` to `"v2"` for the SaaS rehearsal; change it to `"legacy"` for the older self-hosted deployment. No extra environment variable is needed. You can also change `project_name` in that cell for an isolated practice project.
-6. Install [LangSmith CLI](https://docs.langchain.com/langsmith/langsmith-cli) and [langsmith-skills](https://docs.langchain.com/langsmith/skills) for the closing exercise. Verify the CLI's endpoint/project before querying.
+4. Reuse the root `.env`: `LANGSMITH_API_KEY`, `LANGSMITH_ENDPOINT`, `LANGSMITH_PROJECT`, and `WORKSPACE_ID`. `LANGSMITH_WORKSPACE_ID`, if set, takes precedence. On self-hosted, set `LANGSMITH_WEB_URL` to the UI origin too. Ask the facilitator for the API URL, including any required `/api` prefix; the SDK accepts that prefix. Never paste a key into a notebook cell.
+5. Set `participant_id` in notebook setup. It defaults to your OS username; use a unique ID if accounts are shared. The same project suffix is used by the SDK, launcher, CLI, evaluators, and dashboard. Self-hosted defaults to `chart_format = "legacy"`; SaaS uses `"v2"`.
+6. Run setup and copy its launch command into a terminal. The launcher loads the root `.env` and the notebook's selections, keeping credentials in the process environment. It loads the supplied plugin with `claude --plugin-dir <absolute-plugin-path>`; no marketplace publication is needed.
+7. Install [LangSmith CLI](https://docs.langchain.com/langsmith/langsmith-cli) and [langsmith-skills](https://docs.langchain.com/langsmith/skills) for the closing exercise. Remote MCP is optional.
 
-The notebook loads the supplied task plugin with `claude --plugin-dir <absolute-plugin-path>`. No marketplace publication is needed. Its two skills are `workshop:fix-bug` and `workshop:review-change`; its MCP tools are `mcp__plugin_workshop_issues__get_issue` and `mcp__plugin_workshop_issues__get_acceptance_criteria`.
-
-Ask Claude to **invoke the named skill** in natural language. Direct slash commands can expand a skill before the model runs and do not necessarily produce a native LLM `Skill` call.
+The supplied skills are `workshop:fix-bug` and `workshop:review-change`. Both use `mcp__plugin_workshop_issues__get_issue` and `mcp__plugin_workshop_issues__get_acceptance_criteria`. Ask Claude to invoke the skill in natural language: slash commands can expand it before the model runs and may not produce an LLM `Skill` call.
 
 ## Hosted judges
 
-Module 6 and Module 4's online evaluator use the shared helper and model default in `utils/langsmith_rules.py`. For this SaaS rehearsal, cell `m06-27` selects the workspace's existing `OPENAI_API_KEY` secret through the helper's `api_key_env` argument:
+Hosted judges run in LangSmith. A key in the local `.env` does not provision a workspace secret. The facilitator configures the provider credential once, before attendees register evaluators.
 
-- Direct OpenAI: a workspace secret named `OPENAI_API_KEY`.
-- Repository Gateway setup: select `LANGSMITH_API_KEY_GATEWAY` in that cell when a workspace secret with that name exists. Omitting `api_key_env` retains the shared helper's automatic local-environment selection, including legacy `LC_GATEWAY_KEY` support.
-- Other/self-hosted providers: replace the notebook's judge assignment with `rules.judge_model_config(client, template_rule_id="<working-rule-uuid>")`. This advanced option copies an existing working inline evaluator's serialized model and saved-configuration reference without printing them.
+If the workshop uses a temporary APIM credential, the facilitator distributes it through the approved channel and rotates it after the session.
 
-`DEFAULT_JUDGE_MODEL` is the shared model default for both modules. Hosted judges need their provider credential in LangSmith because they run there. Module 4's offline judges instead use the local model in `utils/models.py`. Local key values are never uploaded. Reuse a working workspace provider secret; selecting OpenAI for hosted judges leaves local Gateway configuration in place.
+| Provider | Notebook configuration | LangSmith credential |
+|---|---|---|
+| Azure OpenAI | Existing `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_VERSION`, plus `AZURE_OPENAI_DEPLOYMENT_NAME` | Workspace secret `AZURE_OPENAI_API_KEY` |
+| OpenAI | Shared `DEFAULT_JUDGE_MODEL` from `utils/langsmith_rules.py` | Workspace secret `OPENAI_API_KEY` |
+| LangSmith Gateway | Set `judge_provider = "gateway"` | Workspace secret `LANGSMITH_API_KEY_GATEWAY` |
+| Custom APIM/provider setup | Set `template_rule_id` to a working inline evaluator's rule UUID | Copies its serialized model and saved configuration reference |
 
-Earlier drafts introduced `CODING_AGENT_PROJECT`, `WORKSHOP_JUDGE_MODEL`, `WORKSHOP_JUDGE_TEMPLATE_RULE_ID`, and `WORKSHOP_CHART_FORMAT`. These are no longer read; any entries left in your `.env` can be removed. Claude Code queries and evaluator rules are scoped to `ls_integration=claude-code` within the shared project. An existing project thread-inactivity setting is preserved.
+Azure is selected when `AZURE_OPENAI_ENDPOINT` is set; otherwise the notebook selects OpenAI. Azure's **deployment name** is the required routing identifier. It need not equal the underlying model name. The supplied serializer omits temperature because support differs by deployment. BMS mentioned a `gpt-5.4` deployment; confirm that name, the endpoint, API version, and APIM authentication with the facilitator. Placeholders are in `.env.example`.
+
+For APIM endpoints that need a custom route or header, reuse a working LangSmith evaluator configuration. A local Azure model working does not establish that the self-hosted evaluator workers can reach the same endpoint. Test one hosted quality evaluator before the group starts.
+
+Module 4's online evaluator and Module 6 share `DEFAULT_JUDGE_MODEL`. Module 4's offline judges use the local model in `utils/models.py`; this notebook leaves that choice intact. The helper serializes secret **names**, never local key values. Do not print a copied provider configuration.
+
+## Recovery checkpoints
+
+Always start a fresh kernel with Section 1 so imports, connection settings, and project scope are initialized.
+
+| Starting point | Selection | Next steps |
+|---|---|---|
+| Normal exercise | `activity_source = "live"` | Capture the inspection turn, then continue |
+| Claude setup blocked | `activity_source = "replay"` | Section 1 uploads the recorded inspection; Section 4 uploads four more turns after evaluator registration |
+| Join at dashboards | `activity_source = "prepared"` and the presenter's project name | Run Sections 1–2, then Section 5; adjust `since` to include the supplied traces |
+
+Replay uses the [reviewed recording](fixtures/README.md): five genuine turns from this sample app, 78 runs, five Skill executions, and ten MCP executions. It preserves messages, ordering, durations, token counts, and measured costs. Personal metadata and local paths are removed. Historical feedback is omitted; the enabled judges produce new feedback. Costs describe the original activity, not the cost of running the upload script.
+
+Replay assigns new run/thread IDs per target project and persists its attempt in ignored `.module06/replay/`. Keep that state when resuming after a kernel restart or interrupted upload. Completed stages are skipped. To run a separate rehearsal, use a new participant ID/project; don't delete state midway through an attempt.
+
+The smoke turn is uploaded before evaluators, so it normally has no evaluation. Upload usage only after all five rules are enabled. Rules select newly received runs even though recorded timestamps are shifted into the recent past. Thread feedback still waits for real inactivity after ingestion. If usage was already uploaded with rules disabled, use a new project for a new rehearsal or arrange an explicit backfill with the presenter.
+
+Prepared mode reads an existing project. It skips project creation, rule registration, thread-setting updates, dashboard writes, replay, and cleanup. The presenter supplies populated traces, feedback, and a dashboard; participants can still build notebook rankings and preview the chart queries.
 
 ## Presenter preparation
 
-1. Verify the target deployment's rule, thread-evaluation, metadata-grouped legacy chart, and preview APIs. Version is unknown for the planned self-hosted delivery, so do not rely on newer dashboards or categorical-feedback chart grouping.
-2. Run the notebook's local checks and smoke prompt. Inspect the actual LLM output and Skill/MCP tool names before registering filters or evaluators.
-3. Register the five rules, then work through the prompt cards. Confirm categorical `skill_name`, root quality/completion, LLM selection feedback, and session outcome after inactivity. Root/thread completion judgments deliberately permit insufficient evidence.
-4. Prepare two or three **real captured sessions**: a fix/review, an incomplete result, and a later correction. Keep their IDs/project links privately with your presenter notes. Do not substitute synthetic test fixtures for captured activity. Use the same project and recent time window, or edit the notebook's `since` value to include them.
-5. Build the sampled root-ID groups and preview/provision the native dashboard. Verify invocations against tool spans and root cost/quality against a small sample. Native legacy bars are time-bucket charts; horizontal notebook rankings are whole-window summaries. All native charts use the sampled completed turns: trace IDs for invocations and root IDs for cost/quality. Rerun analysis and chart cells after new activity. Larger comparisons split into charts with up to three series. The notebook selects this dashboard as the project default if none is selected; use **Prebuilt** in the dashboard selector for the Tools section.
-6. Confirm CLI trace/thread queries work. Remote MCP is optional: self-hosted 0.16+ additionally needs hostname/signing configuration and network access to its own `/api/mcp` endpoint. The [local LangSmith MCP server](https://docs.langchain.com/langsmith/langsmith-mcp-server) is an optional alternative for older deployments.
-7. Have BMS validate its connector separately before offering the optional extension. The required exercise uses the local fixture MCP.
+1. Verify the target deployment and an ordinary **Editor** account. The BMS dry run used self-hosted **0.16.65**. Its source supports the selected query/rule contracts, but its feature flags, custom permissions, network access, and provider configuration must be tested on that instance. Don't use workspace admin as the default workaround. Creating/rotating workspace secrets is a facilitator operation requiring secret-management permission.
+2. Check the notebook's API/UI URLs, participant project, local MCP, and smoke prompt. In 2.2, confirm the observed LLM output path matches the server's indexed filter. A visible raw payload doesn't prove it was indexed. Children need not carry the root's integration metadata.
+3. Verify all five rules on incoming turns: categorical `skill_name`, root quality/completion, numeric LLM selection, and session outcome after inactivity. Open the semantic `?tab=evaluators` link. If an old UI doesn't honor it, click **Evaluators** from the project.
+4. Keep a prepared project with a genuine recorded session, populated feedback, and a dashboard. Rehearse both recovery checkpoints from a fresh kernel. One recorded session has one thread; multiple turns do not imply multiple threads. Use a separate replay project to test isolation.
+5. Preview and save the legacy dashboard on self-hosted. The SaaS v2 conversion endpoint is not assumed available on 0.16.65. Check invocation totals, measured whole-trace costs, and numeric quality scores against the notebook. Each native series uses the same sampled trace/root IDs; rerun analysis and chart cells after new activity.
+6. Verify CLI access. Remote MCP on self-hosted 0.16+ additionally needs hostname/signing configuration and reachability to `/api/mcp`; see the [setup guide](https://docs.langchain.com/langsmith/langsmith-remote-mcp#self-hosted-langsmith). LangSmith Chat is optional.
+7. Have BMS validate its M365 connector on an approved demo mailbox. The notebook prompt only reads. Jira is an alternative for users with access; neither connector is required for the local exercise. Never capture real employee messages into the shared workshop fixture.
+8. After final feedback lands, pause the workshop rules. Partial registration is recorded incrementally, so cleanup also works after a later registration failure. A fresh kernel must rerun registration to recover those IDs, or the presenter can pause the named rules in the UI.
 
-The agenda totals 85 minutes with the break. To fit 80 minutes, shorten dashboards to 15 minutes and have the native charts prepared.
+### Capacity for 40–60 attendees
 
-## Starter app and expected results
+Use a separate project per participant, even within one shared workspace. Confirm project/rule/chart permissions, trace-ingestion limits, evaluator-worker capacity, Azure/APIM requests-per-minute and tokens-per-minute limits, and any workspace spending limits with the deployment owner.
 
-The notebook copies `sample_repo/` to a new temporary working directory. It never resets an existing attempt. Keep the Claude session in that directory so all turns belong to the same exercise.
+The recorded exercise contributes **78 runs and five rules per participant**: 3,120 runs/200 rules for 40 people, or 4,680 runs/300 rules for 60. Its four evaluated turns normally request 12 run-level LLM judgments and one idle-thread judgment: roughly 520 or 780 LLM calls respectively, plus model-validation requests and any extra turns. Long conversations can raise token usage substantially. Replay ingestion is faster than live typing, so avoid asking the entire room to replay simultaneously.
 
-- **TASK-001:** the starter's four tests have two failures. The fix excludes completed tasks and tasks due today, and preserves the input.
-- **TASK-002:** adds stable oldest-first ordering and an ordering regression test. The initial tests do not cover it; passing them does not establish TASK-002 success.
-- **Presenter solution:** `solutions/tracker.py` satisfies both issues. It lives outside participant copies.
+Start with one Editor, then a small agreed cohort (for example five attendees). Stagger evaluator registration and activity; monitor queue age, 429s, provider quota, and feedback latency. If queues grow, stop adding turns, let the queue drain, and use the prepared-project checkpoint. Don't run an uncoordinated 40-person load test. A single SaaS rehearsal cannot establish BMS capacity.
 
-The MCP is deliberately small: a local stdio process serves fixed issue IDs. It has no arbitrary file, shell, or network tools. Protocol output is newline-delimited JSON on stdout. Implementation notes and tests live beside the sample rather than in the teaching cells.
+The agenda totals 85 minutes including the break. To fit 80, shorten dashboards to 15 minutes and prepare the native charts ahead of time.
+
+## Starter app
+
+The notebook copies `sample_repo/` to a new temporary directory without resetting prior work. Keep the same Claude session for the follow-up tasks.
+
+- **TASK-001:** four starter tests, two expected failures. Fix filtering without mutating the input.
+- **TASK-002:** stable oldest-first ordering plus regression coverage. Passing the original tests doesn't establish success.
+- **Presenter solution:** `solutions/tracker.py` satisfies both tasks and is kept outside participant copies.
+
+The local MCP exposes fixed issue lookups over stdio. It has no arbitrary file, shell, or network tools.
 
 ## Verification
 
-Run the offline checks from the repository root:
+From the repository root:
 
 ```bash
 uv run python -m unittest discover -s utils/coding_agent_workshop/tests -v
 ```
 
-They check shared setup and judge defaults, launcher/CLI configuration, the known failing starter against the solution, MCP messages over actual stdio, extraction edge cases, metric aggregation, disjoint cohort coverage, and rerunnable API requests using an in-memory transport. These test fixtures are explicitly synthetic. Live SaaS verification and the later self-hosted rehearsal are separate checks.
+Tests cover configuration reuse, safe error diagnostics, Azure serialization, pagination, thread aliases, replay integrity/resumption/isolation, metric aggregation, scoped provisioning, the real stdio MCP, and the starter/reference solution. Unit-test mocks and fixtures do not establish live self-hosted compatibility.
 
-The notebook intentionally requires human Claude Code activity between sections. Do not expect an unattended Run All on an empty project to create that activity. Complete the smoke task before Part 2 and the prompt cards before Part 5. The final cell pauses only this notebook's recorded evaluator IDs.
-
-### Completed development checks
-
-- **Local:** 32 tests pass, including shared configuration, explicit hosted-provider selection, provider secret references, launcher/CLI workspace propagation, conflicting saved Claude credentials, preserved thread settings, the real stdio MCP lifecycle, intentionally failing starter, reference solution, extraction, aggregation, cohort coverage, chart population, and provisioning behavior.
-- **Notebook:** all 43 code cells compile and begin with a purpose comment. The longest code cell is 23 lines. Notebook format validation and HTML conversion pass; saved outputs and execution counts are empty.
-- **Live SaaS (2026-09-25):** all 43 code cells executed successfully in a real Jupyter kernel, with actual Claude Code prompts between sections. Five exercise turns contain five Skill spans and ten local MCP calls. All five evaluator types produced feedback. Hosted judges used the existing OpenAI workspace secret and the shared `gpt-5.6-luna` default. The edited sample passes seven tests.
-- **Charts and CLI:** legacy previews and saved v2 definitions return matching counts, measured costs, and quality scores. Registration reruns retain all five rule IDs, three chart IDs, and five series IDs. CLI trace/thread queries and the Claude LangSmith-skill exercise pass. The final cell disabled the five workshop rules.
-
-### Remaining deployment checks
-
-- Test the older self-hosted deployment with `chart_format = "legacy"` in the setup cell, including saved dashboards, code execution, thread evaluation, and its provider configuration. Validate the optional BMS connector separately.
-- Optional LangSmith Chat and Remote MCP were not exercised in this SaaS rehearsal.
-- Prepare additional real sessions with varied output quality before teaching a leaderboard comparison. The four scored exercise turns all received quality 1.0; this validates the pipeline, not judge calibration or a difference between skills.
+The live path requires Claude activity between sections. Replay mode permits a notebook rehearsal without Claude, with a wait for indexing and hosted feedback. Prepared mode validates analysis against an existing project. Keep notebook outputs cleared before sharing.
 
 ## Troubleshooting
 
-- **No Skill run:** request the skill by name in a normal prompt, check `/plugin`, and inspect the raw LLM output. Tool-call output paths depend on plugin version.
-- **No MCP tools:** check `/mcp`, the absolute `--plugin-dir` path, and whether `python3` is on the terminal's PATH. The notebook checks the stdio server independently.
-- **No traces:** rerun the notebook's launch command so Claude Code gets the shared `.env` and current notebook selections. Check `/plugin` and that the thread is unmuted. The launcher sets `TRACE_TO_LANGSMITH=true`.
-- **Saved Claude tracing settings:** the launcher sets the selected project/endpoint/workspace for this invocation. If a saved Claude settings file supplies a different tracing key, the launcher reports its path and variable name before starting. Remove that override to use the root `.env`; if removal is temporary, restore it after the rehearsal.
-- **Hosted judge errors:** inspect the evaluator's error in LangSmith; confirm the same workspace provider secret used for Module 4, or copy a working model configuration as described above.
-- **Blank feedback averages:** only `output_quality` and `skill_selection` are numeric. Inspect the text values and comments for `skill_name`, `task_completion`, and `session_outcome`. `insufficient_evidence` is a judgment, not an execution error; root/thread judges cannot inspect child test results.
-- **Missing final feedback:** wait for quality, completion, and the idle-thread outcome before running cleanup. Pausing the rules too soon can leave the last turn unscored.
-- **SaaS rejects legacy chart series:** set `chart_format = "v2"` in setup and rerun chart cells. Use `"legacy"` for the older self-hosted rehearsal.
-- **Custom charts not visible:** open the dashboard link printed by the notebook, or select `Module 06 — <project name>` from the dashboard selector. Include the exercise timestamps in the dashboard's time range.
-- **No thread feedback:** leave the session idle for at least the configured interval, then allow evaluator processing time. Feedback is not attached to every child run.
-- **Chart counts differ:** align time windows, check the notebook's completed-turn filter, allow indexing time, and rerun analysis/chart cells for new turns. Missing scores/costs remain missing.
-- **Analysis window exceeds the limit:** narrow `since` or explicitly increase `max_turns`; the utility does not silently truncate totals.
+- **Wrong kernel:** select **Python (modular-workshop)** after registering it through `uv run python`; a system `python -m ipykernel` can register the wrong environment.
+- **Self-hosted setup error:** set both API and UI URLs in root `.env`, then rerun setup. Hostnames aren't restricted to SaaS.
+- **No Skill rows:** ask for the named skill in natural language, inspect the LLM output, then verify the indexed predicate. Retry after indexing; persistent failure needs the presenter's payload-indexing/path check. Don't silently broaden the selection judge to every LLM run.
+- **One MCP row:** the first table counts matching turns. The second counts actual tool executions; the smoke task should show two local MCP tools in one turn.
+- **One thread:** expected for one Claude session. Send another prompt in the same session for another turn, or start a new session for another thread. The helper supports `thread_id`, `session_id`, and `conversation_id` metadata.
+- **No traces:** use the printed launch command, check `/plugin`, and confirm the thread isn't muted. The launcher sets `TRACE_TO_LANGSMITH=true`.
+- **Saved tracing key conflict:** the launcher reports the settings path and variable name. Resolve the saved override so the root `.env` can supply the key. Restore temporary global configuration changes after testing.
+- **Evaluator registration fails:** the helper reports the operation, HTTP status, safe category, and request ID when available. `401` means authentication; `403` requires checking workspace/operation permissions; `400/422` can indicate a missing hosted secret or invalid provider/model configuration; `404` can indicate an unsupported path; `429` means rate limiting. Share these diagnostics with the deployment owner, who can inspect server logs. Avoid sharing raw bodies or credentials.
+- **Rule exists but feedback fails:** check the evaluator's execution error and provider connectivity from LangSmith workers. Successful code evaluation doesn't validate Azure credentials or model settings.
+- **Missing feedback:** allow indexing, model processing, and the configured thread-idle interval. Only `output_quality` and `skill_selection` are numeric; the other feedback keys are text. `insufficient_evidence` is a valid result, not an execution error.
+- **Missing custom charts:** open the printed dashboard link or select `Module 06 — <project name>`. Include the trace timestamps in the time range. Choose **Prebuilt → Tools** for the built-in tool charts.
+- **Feedback exists but the quality chart is blank:** chart aggregates can lag the feedback table. The preview reports numeric feedback sample counts; rerun it after processing catches up. Don't rewrite or duplicate feedback to fill the chart.
+- **Totals differ:** align the time window and sample. Root run-local cost excludes children, so notebook turn costs use the native trace aggregate. Missing costs/scores remain missing. Rerun analysis and chart cells after additional activity.
+- **Query exceeds its bound:** narrow `since` or intentionally raise the limit. The helpers raise instead of silently truncating totals.

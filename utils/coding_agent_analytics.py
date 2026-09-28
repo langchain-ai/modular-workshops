@@ -2,18 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
 import html
 import json
 import math
 import os
+import re
 import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 from collections import Counter, defaultdict
-from datetime import datetime, timezone
-from itertools import islice
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 from uuid import uuid4
@@ -30,7 +31,7 @@ def field(obj, name, default=None):
 
 
 def metadata(run):
-    return (field(run, "extra") or {}).get("metadata") or {}
+    return {**((field(run, "extra") or {}).get("metadata") or {}), **(field(run, "metadata") or {})}
 
 
 def check_settings(api_url: str, web_url: str):
@@ -43,11 +44,27 @@ def check_settings(api_url: str, web_url: str):
             raise ValueError(f"The {label} URL must not contain credentials, a query, or a fragment.")
     if not os.environ.get("LANGSMITH_API_KEY"):
         raise ValueError("Set LANGSMITH_API_KEY in your environment before connecting.")
-    if "smith.langchain.com" not in urlsplit(api_url).hostname and "smith.langchain.com" in web_url:
-        raise ValueError("Set LANGSMITH_WEB_URL to your self-hosted UI URL too.")
+    if not is_cloud_url(api_url) and is_cloud_url(web_url):
+        raise ValueError("LANGSMITH_ENDPOINT selects self-hosted but LANGSMITH_WEB_URL selects SaaS. "
+                         "Set both URLs in the root .env and rerun setup.")
     print("LangSmith credential: set")
     print("API:", api_url)
     print("UI: ", web_url)
+
+
+def is_cloud_url(url):
+    host = urlsplit(url).hostname or ""
+    return host == "smith.langchain.com" or host.endswith(".smith.langchain.com")
+
+
+def participant_project(base, participant):
+    """Use one stable participant suffix for SDK, Claude, CLI, and dashboards."""
+    suffix = re.sub(r"[^a-z0-9-]+", "-", participant.lower()).strip("-")
+    if not suffix or len(suffix) > 48:
+        raise ValueError("Use a short participant ID containing letters or numbers.")
+    if not base or len(base) > 150:
+        raise ValueError("Set a short LANGSMITH_PROJECT base name.")
+    return base if base.endswith("-" + suffix) else f"{base}-{suffix}"
 
 
 def ensure_project(client: Client, project_name: str):
@@ -68,7 +85,18 @@ def run_url(run, project, web_url: str) -> str:
 
 def thread_id(run):
     info = metadata(run)
-    return info.get("thread_id") or info.get("session_id") or info.get("conversation_id")
+    return field(run, "thread_id") or info.get("thread_id") or info.get("session_id") or info.get("conversation_id")
+
+
+def thread_filter(run):
+    """Match the metadata key actually used by the captured session."""
+    info = metadata(run)
+    for key in ("thread_id", "session_id", "conversation_id"):
+        if info.get(key):
+            return f'and(eq(metadata_key, {json.dumps(key)}), eq(metadata_value, {json.dumps(info[key])}))'
+    if field(run, "thread_id"):
+        return f'eq(thread_id, {json.dumps(str(field(run, "thread_id")))})'
+    raise ValueError("Selected turn has no thread ID. Inspect its metadata before querying a session.")
 
 
 def prepare_workspace(project_root: Path) -> Path:
@@ -140,7 +168,7 @@ def display_table(rows: list[dict]):
 
 def show_runs(runs, project, web_url):
     display_table([{"run": str(field(run, "id"))[:8], "name": field(run, "name"),
-                    "type": field(run, "run_type"), "cost ($)": field(run, "total_cost"),
+                    "type": field(run, "run_type"), "cost ($)": turn_cost(run),
                     "thread": thread_id(run), "link": run_url(run, project, web_url)} for run in runs])
 
 
@@ -150,16 +178,68 @@ def require_first(items, message="No traces yet. Complete the smoke task and rer
     return items[0]
 
 
-def read_trace(client, project_name, root, max_runs=500):
+RUN_FIELDS = ["ID", "NAME", "RUN_TYPE", "START_TIME", "END_TIME", "ERROR", "INPUTS", "OUTPUTS",
+              "EXTRA", "METADATA", "TRACE_ID", "THREAD_ID", "DOTTED_ORDER", "PARENT_RUN_IDS",
+              "IS_ROOT", "TOTAL_COST", "PROMPT_COST", "COMPLETION_COST", "TOTAL_TOKENS",
+              "PROMPT_TOKENS", "COMPLETION_TOKENS"]
+
+
+async def query_runs(client, project, *, since, max_runs=500, limit=None, **filters):
+    """Read explicit fields across pages; normalize the v2 SDK at one boundary."""
+    result = []
+    query = client.runs.query(project_ids=[str(project.id)], min_start_time=since,
+                              selects=RUN_FIELDS, page_size=100, **filters)
+    async with asyncio.timeout(60):
+        async for run in query:
+            row = dict(run) if isinstance(run, dict) else run.to_dict(mode="python", use_api_names=False)
+            row["run_type"] = (row.get("run_type") or "").lower()
+            result.append(row)
+            if len(result) > max_runs:
+                raise ValueError(f"More than {max_runs} runs matched. Narrow the window or increase max_runs.")
+            if limit and len(result) >= limit:
+                break
+    return result
+
+
+async def query_turns(client, project, *, since, **filters):
+    """Read turns with native trace costs; a root's own cost excludes its children."""
+    roots = await query_runs(client, project, since=since, is_root=True, **filters)
+    by_id = {str(field(root, "id")): root for root in roots}
+    for root in roots:
+        root["trace_total_cost"] = None
+    ids = list(by_id)
+    for start in range(0, len(ids), 100):
+        query = client.traces.query(project_id=str(project.id), trace_ids=ids[start:start + 100],
+                                     min_start_time=since, selects=["ID", "TRACE_ID", "TOTAL_COST"], page_size=100)
+        count = 0
+        async with asyncio.timeout(60):
+            async for trace in query:
+                count += 1
+                if count > 100:
+                    raise ValueError("Trace cost query returned more rows than requested.")
+                root_id = str(field(field(trace, "root_run"), "id"))
+                if root_id in by_id:
+                    by_id[root_id]["trace_total_cost"] = field(field(trace, "trace_aggregates"), "total_cost")
+    return roots
+
+
+def turn_cost(run):
+    return field(run, "trace_total_cost", field(run, "total_cost"))
+
+
+async def read_trace(client, project, root, max_runs=500):
     """Fetch a complete trace or fail rather than silently omit tool runs."""
-    # Let the SDK use the server's page size; its limit parameter is also sent
-    # to the API, which can reject values above 100 even for a whole trace.
-    query = client.list_runs(project_name=project_name, trace_id=field(root, "trace_id"))
-    runs = list(islice(query, max_runs + 1))
-    if len(runs) > max_runs:
-        raise ValueError(f"Trace exceeds {max_runs} runs; raise max_runs before analyzing it.")
+    start = field(root, "start_time")
+    if isinstance(start, str):
+        start = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    if start is None:
+        raise ValueError("Select a root with start_time before loading its trace.")
+    runs = await query_runs(client, project, trace_id=str(field(root, "trace_id") or field(root, "id")),
+                            since=start - timedelta(seconds=1), max_runs=max_runs)
     if str(field(root, "id")) not in {str(field(run, "id")) for run in runs}:
         raise ValueError("Trace is still arriving; rerun this cell when its root is available.")
+    if isinstance(root, dict) and "trace_total_cost" in root:
+        next(run for run in runs if str(run["id"]) == str(root["id"]))["trace_total_cost"] = root["trace_total_cost"]
     return sorted(runs, key=lambda run: field(run, "dotted_order") or str(field(run, "start_time")))
 
 
@@ -205,6 +285,18 @@ def observed_call_path(run):
     raise ValueError("Inspect an LLM run with a tool call before choosing its filter path.")
 
 
+async def verify_skill_filter(client, project, llm_run, filter, *, since):
+    """A visible payload is not proof that the server indexed its tool calls."""
+    matches = await query_runs(client, project, since=since, ids=[str(field(llm_run, "id"))], filter=filter)
+    if not matches:
+        raise ValueError(
+            "The observed Skill call did not match the server filter. Allow indexing time and retry. "
+            "If it persists, check the output path and payload-indexing settings with the presenter "
+            "before registering Skill evaluators. The raw trace still contains the call."
+        )
+    print("Skill filter matched the inspected LLM run.")
+
+
 def tool_name(run):
     return metadata(run).get("ls_tool_name") or field(run, "name", "")
 
@@ -236,16 +328,13 @@ def mcp_counts(runs):
                    and tool_name(run).startswith("mcp__"))
 
 
-def load_traces(client, project_name, since, max_turns=30, filter=None):
-    query = client.list_runs(project_name=project_name, is_root=True, start_time=since, filter=filter)
-    roots = list(islice(query, max_turns + 1))
-    if len(roots) > max_turns:
-        raise ValueError(f"More than {max_turns} turns in this window. Narrow since or increase max_turns.")
+async def load_traces(client, project, since, max_turns=30, filter=None):
+    roots = await query_turns(client, project, since=since, filter=filter, max_runs=max_turns)
     completed = [root for root in roots if field(root, "end_time")]
     if not completed:
         raise ValueError("No completed turns in the selected window.")
     print(f"Analyzing {len(completed)} completed turns; {len(roots) - len(completed)} still running.")
-    return {str(root.id): read_trace(client, project_name, root) for root in completed}
+    return {str(field(root, "id")): await read_trace(client, project, root) for root in completed}
 
 
 def read_feedback(client, runs, keys):
@@ -324,7 +413,7 @@ def turn_metrics(traces, scores=None):
         group, _ = cohort(runs)
         row = groups[group]
         row["turns"] += 1
-        cost = field(root, "total_cost")
+        cost = turn_cost(root)
         if cost is not None:
             row["known_costs"].append(float(cost))
         if scores and root_id in scores:
@@ -434,7 +523,15 @@ def preview_charts(client, project, specs, since):
             "bucket_info": {"start_time": since.isoformat(), "end_time": datetime.now(timezone.utc).isoformat(),
                             "timezone": "UTC", "stride": {"minutes": 30}},
             "chart": {"series": series}})
-        results.append({"chart": spec["title"], "buckets returned": len(data.get("data") or [])})
+        buckets = data.get("data") or []
+        samples = None
+        if spec.get("feedback_key"):
+            samples = sum((item.get("value") or {}).get(spec["feedback_key"], {}).get("n", 0)
+                          for item in buckets)
+            if not samples:
+                print(f"{spec['title']}: no numeric feedback in the chart yet. "
+                      "Check the feedback table, then rerun this preview after processing catches up.")
+        results.append({"chart": spec["title"], "buckets returned": len(buckets), "feedback samples": samples})
     display_table(results)
     return results
 
