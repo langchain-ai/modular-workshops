@@ -1,0 +1,54 @@
+utils/coding_agent_workshop/tests/test_diagnostics.py
+  s_76881090a1a706::t_c535a789a65223 148-149,163-184
+  s_76881090a1a706::t_db37133b8d6944 185
+utils/coding_agent_workshop/tests/test_skill_feedback_fallback.py
+  s_76881090a1a706::t_031901a919f261 81
+  s_76881090a1a706::t_1fcd421b28337f 1-80,82-132
+utils/coding_agent_workshop/tests/test_failure_output.py
+  s_76881090a1a706::t_5bd6aafe068b8e 242-253
+  s_76881090a1a706::t_f2758112fa83fa 145,221-240
+  s_76881090a1a706::t_4c31cb8d7bb213 10,67-68,103-107,122-123
+  s_76881090a1a706::t_a0dab4eee632bb 241
+utils/coding_agent_analytics.py
+  s_76881090a1a706::t_c12309b573ffed 28,551-557,559-567,569-574,580-581,585-599
+  s_76881090a1a706::t_d93cdd9d963907 291-294,313,322-342,344-361,366-373,379-384
+  s_76881090a1a706::t_eb5394e7551e3c 362-365
+  s_76881090a1a706::t_ee9ba527164caf 343,374-378,582-584
+  s_76881090a1a706::t_5ac05da9ba5b09 385-386
+  s_76881090a1a706::t_d9da9ac011ade7 600-601
+utils/coding_agent_diagnostics.py
+  s_76881090a1a706::t_326beea78c32f0 33,204,208,211-212,217-218,223-224,228-232,236,255-259,263-264
+  s_76881090a1a706::t_523bf94420cbe3 175
+utils/coding_agent_workshop/tests/verify_diagnostic_export.py
+  s_76881090a1a706::t_115dc2ab574473 50,57-80,86-89,98-100
+modules/06_coding_agent_analytics.ipynb
+  s_76881090a1a706::t_d7675ac31356fa 547
+  s_76881090a1a706::t_892c9f6fd2fafa 40,93-94,96,283-293,353,355,365-368,373-386,388,533,536,538,541,544-546,548-549,712-714,754,756-768,770,1068
+utils/coding_agent_workshop/tests/test_bms_retest.py
+  s_76881090a1a706::t_89cd7b3d7d435e 18,58-59,68,78
+utils/coding_agent_workshop/README.md
+  s_76881090a1a706::t_a4a667d9258d4a 178
+  s_76881090a1a706::t_79cb66c83771a6 88,90-93,114,140
+  s_76881090a1a706::t_e32a89cf7ef53f 141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "aa1566ffa29ca91e50da328a6fb2ed094d1dd513",
+  "prompts": {},
+  "humans": {
+    "h_7cae82992be157": {
+      "author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_76881090a1a706": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d0f1-25ea-7f12-891e-209179a303b0",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  }
+}
