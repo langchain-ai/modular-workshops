@@ -202,7 +202,7 @@ async def query_runs(client, project, *, since, max_runs=500, limit=None, **filt
 
 
 async def query_turns(client, project, *, since, **filters):
-    """Read turns with native trace costs; a root's own cost excludes its children."""
+    """Use explicit trace aggregates; root cost semantics vary by query backend."""
     roots = await query_runs(client, project, since=since, is_root=True, **filters)
     by_id = {str(field(root, "id")): root for root in roots}
     for root in roots:
@@ -288,13 +288,30 @@ def observed_call_path(run):
 async def verify_skill_filter(client, project, llm_run, filter, *, since):
     """A visible payload is not proof that the server indexed its tool calls."""
     matches = await query_runs(client, project, since=since, ids=[str(field(llm_run, "id"))], filter=filter)
-    if not matches:
+    run_id = str(field(llm_run, "id"))
+    if not any(str(field(run, "id")) == run_id for run in matches):
         raise ValueError(
             "The observed Skill call did not match the server filter. Allow indexing time and retry. "
-            "If it persists, check the output path and payload-indexing settings with the presenter "
-            "before registering Skill evaluators. The raw trace still contains the call."
+            "If it persists, run the read-only diagnostics in the workshop README. "
+            "Skill evaluator registration is blocked until this check passes. "
+            "The raw trace still contains the call."
         )
+    if field(llm_run, "run_type", "").lower() != "llm" or not any(
+            call["name"] == "Skill" for call in tool_calls(llm_run)):
+        raise ValueError("Select an LLM run whose output contains a Skill call before verifying its filter.")
     print("Skill filter matched the inspected LLM run.")
+    return _skill_filter_scope(client, project, llm_run, filter, since)
+
+
+def _skill_filter_scope(client, project, llm_run, filter, since):
+    return (id(client), str(project.id), str(field(llm_run, "id")), filter, str(since))
+
+
+def require_skill_filter_validation(validation, client, project, llm_run, filter, *, since):
+    """Reject missing or stale notebook validation before either Skill rule write."""
+    if validation != _skill_filter_scope(client, project, llm_run, filter, since):
+        raise ValueError("Rerun Section 2.2 successfully with the current connection, project, "
+                         "LLM run, filter, and time window before registering Skill evaluators.")
 
 
 def tool_name(run):
@@ -374,6 +391,30 @@ def label_counts(feedback):
             value = field(item, "value")
             counts.update([value] if isinstance(value, str) else (value or []))
     return counts
+
+
+def show_skill_feedback(runs, feedback):
+    """Show both decision-level feedback types without guessing rule eligibility."""
+    latest = {}
+    for item in sorted(feedback, key=lambda item: str(field(item, "created_at", ""))):
+        latest[(str(field(item, "run_id")), field(item, "key"))] = item
+    rows = []
+    for run in runs:
+        calls = [call for call in tool_calls(run) if call["name"] == "Skill"]
+        if field(run, "run_type") != "llm" or not calls:
+            continue
+        run_id = str(field(run, "id"))
+        labels = field(latest.get((run_id, "skill_name")), "value")
+        score = latest_scores([latest.get((run_id, "skill_selection"))], "skill_selection").get(run_id)
+        missing = [key for key, value in (("skill_name", labels), ("skill_selection", score)) if value is None]
+        rows.append({"decision run": run_id, "selected skills": [call["args"].get("skill") for call in calls],
+                     "skill_name": labels, "skill_selection": score,
+                     "feedback": "complete" if not missing else "missing " + ", ".join(missing)})
+    display_table(rows)
+    if any(row["feedback"] != "complete" for row in rows):
+        print("Missing feedback can be pre-registration, pending, or not evaluated. "
+              "Check rule eligibility and execution logs; use a fresh Skill turn after registration.")
+    return rows
 
 
 def cohort(runs):
@@ -536,8 +577,15 @@ def preview_charts(client, project, specs, since):
     return results
 
 
+def section_read_body():
+    """0.16.65 streams populated legacy sections even when omit_data is true."""
+    end = datetime.now(timezone.utc).replace(second=0, microsecond=0)
+    return {"omit_data": True, "start_time": (end - timedelta(minutes=1)).isoformat(),
+            "end_time": end.isoformat(), "timezone": "UTC", "stride": {"minutes": 1}}
+
+
 def ensure_charts(client, project, dashboard, specs, chart_format="legacy"):
-    section = api_request(client, "POST", f"/charts/section/{dashboard['id']}", json={"omit_data": True})
+    section = api_request(client, "POST", f"/charts/section/{dashboard['id']}", json=section_read_body())
     existing = section.get("charts") or []
     result = []
     for spec in specs:

@@ -75,10 +75,51 @@ Prepared mode reads an existing project. It skips project creation, rule registr
 2. Check the notebook's API/UI URLs, participant project, local MCP, and smoke prompt. In 2.2, confirm the observed LLM output path matches the server's indexed filter. A visible raw payload doesn't prove it was indexed. Children need not carry the root's integration metadata.
 3. Verify all five rules on incoming turns: categorical `skill_name`, root quality/completion, numeric LLM selection, and session outcome after inactivity. Open the semantic `?tab=evaluators` link. If an old UI doesn't honor it, click **Evaluators** from the project.
 4. Keep a prepared project with a genuine recorded session, populated feedback, and a dashboard. Rehearse both recovery checkpoints from a fresh kernel. One recorded session has one thread; multiple turns do not imply multiple threads. Use a separate replay project to test isolation.
-5. Preview and save the legacy dashboard on self-hosted. The SaaS v2 conversion endpoint is not assumed available on 0.16.65. Check invocation totals, measured whole-trace costs, and numeric quality scores against the notebook. Each native series uses the same sampled trace/root IDs; rerun analysis and chart cells after new activity.
+5. Preview and save the legacy dashboard on self-hosted, then save again, including after a kernel restart. The SaaS v2 conversion endpoint is not assumed available on 0.16.65. Check stable dashboard/chart IDs, invocation totals, measured whole-trace costs, and numeric quality scores against the notebook. Each native series uses the same sampled trace/root IDs; rerun analysis and chart cells after new activity.
 6. Verify CLI access. Remote MCP on self-hosted 0.16+ additionally needs hostname/signing configuration and reachability to `/api/mcp`; see the [setup guide](https://docs.langchain.com/langsmith/langsmith-remote-mcp#self-hosted-langsmith). LangSmith Chat is optional.
 7. Have BMS validate its M365 connector on an approved demo mailbox. The notebook prompt only reads. Jira is an alternative for users with access; neither connector is required for the local exercise. Never capture real employee messages into the shared workshop fixture.
 8. After final feedback lands, pause the workshop rules. Partial registration is recorded incrementally, so cleanup also works after a later registration failure. A fresh kernel must rerun registration to recover those IDs, or the presenter can pause the named rules in the UI.
+
+## Read-only diagnostics
+
+If the Skill verification fails or every turn has missing cost, run this in a temporary notebook cell using the existing connection and the known Skill-calling LLM. Keep `since` fixed so it includes that run:
+
+```python
+from utils.coding_agent_diagnostics import collect_diagnostics
+
+diagnostic_report = await collect_diagnostics(
+    client, project, llm_run_id=analytics.field(llm_run, "id"), since=since,
+    dashboard_id=dashboard["id"] if globals().get("dashboard") else None,
+    include_pricing=True,
+)
+print(json.dumps(diagnostic_report, indent=2))
+```
+
+The report compares the exact run through legacy and V2 queries, decomposes the Skill predicate, and compares cost fields before and after SDK/helper normalization. It includes model/provider/plugin versions, the two Skill rules' enabled/filter state, and recent execution-outcome counts. It excludes prompts, responses, tool arguments, provider configurations, and credentials. Pricing results are **candidates from substring search**, not proof that a price matches; the facilitator checks the actual model/provider/date and rates in the UI.
+
+For a fresh terminal, run from the repository root with the actual IDs and a timestamp containing the original run:
+
+```bash
+.venv/bin/python -m utils.coding_agent_diagnostics \
+  --project '<exact participant project name>' \
+  --llm-run-id '<Skill-calling LLM UUID>' \
+  --since '<ISO timestamp with timezone>' \
+  --dashboard-id '<existing dashboard UUID>' \
+  --include-pricing
+```
+
+The CLI loads the root `.env` and reads an existing project. Omit `--dashboard-id` if no dashboard has been created. Neither invocation changes rules, traces, prices, or dashboards. The optional dashboard check compares the old read request with a bounded one-minute read; it may deliberately record the old HTTP 404. Share the report with the presenter and deployment owner.
+
+Interpret the report in order:
+
+1. **ID-only lookup fails:** check project, ID, connection, and time bounds first.
+2. **ID resolves but output probes fail on both APIs:** inspect payload indexing on the deployment. On the 0.16.65 ClickHouse path, check `FF_CH_SEARCH_ENABLED` and the indexed pairs on ingest workers. Raw outputs can exist without searchable pairs. Validate a configuration correction with new activity.
+3. **Legacy matches but V2 fails:** investigate query routing/compatibility before changing the expression.
+4. **Filter matches but feedback is missing:** inspect the two Skill rules and their execution logs, then generate a fresh completed Skill turn after both rules register. Section 5.1 checks both `skill_name` and `skill_selection`; the pre-registration smoke turn normally has neither. Do not bypass the registration gate.
+5. **Raw LLM costs are absent:** check the actual Claude model/provider, usage metadata and price mapping. Azure judge pricing is a separate concern. If raw costs exist but normalized values disappear, compare root IDs and response fields. Pricing edits do not recalculate old traces; test new activity. Unknown cost remains unknown.
+6. **Dashboard without dates fails but bounded read succeeds:** this matches the 0.16.65 populated-section time-window behavior. The updated save helper supplies dates. A genuine missing dashboard remains an error; recreating it can introduce duplicates.
+
+After correction, exercise both workshop skills and verify all five feedback types. Save the dashboard twice and reconnect in a fresh kernel to verify the same IDs are reused. Wait for final feedback, then run the exact-ID pause cell.
 
 ### Capacity for 40–60 attendees
 
@@ -112,6 +153,12 @@ Tests cover configuration reuse, safe error diagnostics, Azure serialization, pa
 
 The live path requires Claude activity between sections. Replay mode permits a notebook rehearsal without Claude, with a wait for indexing and hosted feedback. Prepared mode validates analysis against an existing project. Keep notebook outputs cleared before sharing.
 
+### Final notebook release checklist
+
+- [ ] Run every cell and audit its output. Remove diagnostic/debug output and redundant status messages or detail dumps from the normal notebook flow; keep each cell's essential instructional results clean and minimal.
+- [ ] Keep troubleshooting diagnostics explicitly optional and separate from the normal cell outputs.
+- [ ] Clear saved cell outputs and execution counts before distributing the final notebook.
+
 ## Troubleshooting
 
 - **Wrong kernel:** select **Python (modular-workshop)** after registering it through `uv run python`; a system `python -m ipykernel` can register the wrong environment.
@@ -126,5 +173,5 @@ The live path requires Claude activity between sections. Replay mode permits a n
 - **Missing feedback:** allow indexing, model processing, and the configured thread-idle interval. Only `output_quality` and `skill_selection` are numeric; the other feedback keys are text. `insufficient_evidence` is a valid result, not an execution error.
 - **Missing custom charts:** open the printed dashboard link or select `Module 06 — <project name>`. Include the trace timestamps in the time range. Choose **Prebuilt → Tools** for the built-in tool charts.
 - **Feedback exists but the quality chart is blank:** chart aggregates can lag the feedback table. The preview reports numeric feedback sample counts; rerun it after processing catches up. Don't rewrite or duplicate feedback to fill the chart.
-- **Totals differ:** align the time window and sample. Root run-local cost excludes children, so notebook turn costs use the native trace aggregate. Missing costs/scores remain missing. Rerun analysis and chart cells after additional activity.
+- **Totals differ:** align the time window and sample. Root cost semantics differ between native and legacy query backends, so notebook turn costs use the explicit trace aggregate. Never sum an aggregate root with its children. Missing costs/scores remain missing. Rerun analysis and chart cells after additional activity.
 - **Query exceeds its bound:** narrow `since` or intentionally raise the limit. The helpers raise instead of silently truncating totals.

@@ -226,6 +226,7 @@ class LangSmithRequestError(RuntimeError):
             "model-configuration": "Check the hosted model's provider, deployment, endpoint and API version.",
             "validation": "Compare the request fields with this deployment's API schema.",
             "not-found": "Check the resource ID and API path on this deployment.",
+            "chart-time-window": "Supply start_time and end_time when reading this dashboard's charts.",
             "rate-limit": "Allow the configured rate limit to recover before retrying.",
             "server": "Ask the deployment owner to inspect the request in server logs.",
             "timeout": "Check connectivity and server logs before retrying a create operation.",
@@ -262,7 +263,10 @@ def _request_error(method, path, exc, response=None):
             request_id = candidate
         # Classify a bounded body internally. Never print body text or exception messages.
         detail = response.content[:16384].decode("utf-8", errors="replace").lower()
-        if status in (400, 422):
+        if status in (404, 422) and path.startswith("/charts/") and any(
+                message in detail for message in ("start_time must be set.", "end_time must be set.")):
+            category = "chart-time-window"
+        elif status in (400, 422):
             if "secret" in detail and any(word in detail for word in ("missing", "not found", "not set", "not provided")):
                 category = "provider-secret"
             elif any(word in detail for word in ("deserializ", "model", "deployment", "azure", "playground")):
