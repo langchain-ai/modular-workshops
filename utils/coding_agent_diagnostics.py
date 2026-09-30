@@ -8,11 +8,13 @@ import json
 import math
 import os
 import re
+import traceback
 from collections import Counter
 from datetime import datetime, timezone
 from decimal import Decimal
 from importlib.metadata import version
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 import requests
@@ -28,6 +30,17 @@ COST_FIELDS = ("total_cost", "prompt_cost", "completion_cost", "total_tokens", "
 RUN_SELECTS = ["ID", "TRACE_ID", "RUN_TYPE", "START_TIME", "END_TIME", "OUTPUTS", "EXTRA", "METADATA",
                "PRICE_MODEL_ID", *[name.upper() for name in COST_FIELDS]]
 MODEL_FIELDS = ("ls_model_name", "ls_provider", "ls_integration_version", "ls_agent_runtime_version")
+DIAGNOSTICS_VERSION = "2026-09-30.1"
+REPORT_TIMEOUT_SECONDS = 120
+PROBE_TIMEOUT_SECONDS = 20
+
+
+class DiagnosticResponseError(ValueError):
+    """Distinguish an unexpected response envelope from an empty query result."""
+
+    def __init__(self, expected):
+        self.expected = expected
+        super().__init__("Unexpected diagnostic response shape.")
 
 
 def _text(value):
@@ -55,25 +68,38 @@ def _dict(value):
 
 
 def _error(exc, path):
-    error = exc if isinstance(exc, rules.LangSmithRequestError) else rules._request_error("READ", path, exc)
-    return {"ok": False, "status": error.status_code, "category": error.category,
-            "request_id": error.request_id, "error_type": type(exc).__name__}
+    try:
+        error = exc if isinstance(exc, rules.LangSmithRequestError) else rules._request_error("READ", path, exc)
+    except Exception:
+        # A malformed/streaming error response must not break error reporting too.
+        error = rules.LangSmithRequestError("READ", path, category="error-classification-failed")
+    return {"ok": False, "status": error.status_code,
+            "category": "response-shape" if isinstance(exc, DiagnosticResponseError) else error.category,
+            "operation": path,
+            "expected": exc.expected if isinstance(exc, DiagnosticResponseError) else None,
+            "request_id": _text(error.request_id), "error_type": type(exc).__name__,
+            "location": [f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
+                         for frame in traceback.extract_tb(exc.__traceback__)[-3:]]}
 
 
 async def _capture(call, path):
     try:
-        result = call()
-        if asyncio.iscoroutine(result):
-            result = await result
+        # Legacy reads are synchronous. Keep them off the notebook event loop so
+        # the report deadline can fire and completed probe output stays visible.
+        async with asyncio.timeout(PROBE_TIMEOUT_SECONDS):
+            result = await asyncio.to_thread(call)
+            if asyncio.iscoroutine(result):
+                result = await result
         return {"ok": True, "result": result}
-    except ERRORS as exc:
+    except Exception as exc:
+        # A diagnostic parse/SDK error must be reported without hiding other probes.
         return _error(exc, path)
 
 
 def _rows(data, key):
-    rows = data.get(key, []) if isinstance(data, dict) else []
-    if not isinstance(rows, list) or len(rows) > 10:
-        raise ValueError("Diagnostic query exceeded its expected row bound.")
+    rows = data.get(key) if isinstance(data, dict) else None
+    if not isinstance(rows, list) or len(rows) > 10 or any(not isinstance(row, dict) for row in rows):
+        raise DiagnosticResponseError(f"{key}: list of at most 10 objects")
     return rows
 
 
@@ -97,16 +123,23 @@ def _cost_summary(row):
             **{key: _measurement(row, key) for key in COST_FIELDS}}
 
 
-async def _modern_runs(client, project_id, ids, since, until, predicate=None):
+async def _modern_runs(client, project_id, ids, since, until, predicate=None, selects=None):
     kwargs = dict(project_ids=[project_id], ids=ids, min_start_time=since, max_start_time=until,
-                  selects=RUN_SELECTS, page_size=10, timeout=15)
+                  selects=selects or analytics.RUN_FIELDS, page_size=10, timeout=10)
     if predicate:
         kwargs["filter"] = predicate
     async with asyncio.timeout(35):
         response = await client.runs.with_raw_response.query(**kwargs)
         raw = await response.json()
-        parsed = await response.parse()
-    return {"raw": _rows(raw, "items"), "sdk": [_dict(row) for row in parsed.items]}
+        result = {"raw": _rows(raw, "items"), "sdk": [],
+                  "status": getattr(response, "status_code", None),
+                  "request_id": _text(getattr(response, "headers", {}).get("x-request-id"))}
+        try:
+            parsed = await response.parse()
+            result["sdk"] = [_dict(row) for row in parsed.items]
+        except Exception as exc:
+            result["sdk_error"] = _error(exc, "/api/v2/runs/query:parse")
+    return result
 
 
 def _legacy_runs(client, project_id, ids, since, until, predicate=None):
@@ -115,29 +148,54 @@ def _legacy_runs(client, project_id, ids, since, until, predicate=None):
             "select": [name.lower() for name in RUN_SELECTS if name != "METADATA"]}
     if predicate:
         body["filter"] = predicate
-    return _rows(rules.api_request(client, "POST", "/runs/query", json=body), "runs")
+    return _rows(rules.api_request(client, "POST", "/runs/query", json=body, timeout=10), "runs")
 
 
 def _match_summary(result, run_id, modern=False):
     if not result["ok"]:
         return result
     rows = result["result"]["raw"] if modern else result["result"]
-    return {"ok": True, "matched": _one(rows, run_id) is not None,
-            "returned_ids": [_text(row.get("id")) for row in rows]}
+    summary = {"ok": True, "matched": _one(rows, run_id) is not None,
+               "returned_ids": [_text(row.get("id")) for row in rows]}
+    if modern:
+        summary.update({"status": result["result"]["status"], "request_id": result["result"]["request_id"],
+                        "sdk_matched": _one(result["result"]["sdk"], run_id) is not None,
+                        "sdk_returned_ids": [_text(row.get("id")) for row in result["result"]["sdk"]]})
+        if "sdk_error" in result["result"]:
+            summary["sdk_error"] = result["result"]["sdk_error"]
+    return summary
+
+
+def _payload_summary(run):
+    """Evidence about the call's shape, never its content or arguments."""
+    calls = analytics.tool_calls(run)
+    return {"id": _text(analytics.field(run, "id")),
+            "trace_id": _text(analytics.field(run, "trace_id")),
+            "start_time": _text(analytics.field(run, "start_time")),
+            "run_type": _text(analytics.field(run, "run_type")),
+            "skill_call_count": sum(call["name"] == "Skill" for call in calls),
+            "observed_call_path": analytics.observed_call_path(run) if calls else None}
 
 
 async def _trace_costs(client, project_id, trace_id, since, until):
     async with asyncio.timeout(35):
         response = await client.traces.with_raw_response.query(
             project_id=project_id, trace_ids=[trace_id], min_start_time=since, max_start_time=until,
-            selects=["ID", "TRACE_ID", *[key.upper() for key in COST_FIELDS]], page_size=10, timeout=15,
+            selects=["ID", "TRACE_ID", *[key.upper() for key in COST_FIELDS]], page_size=10, timeout=10,
         )
         raw = _rows(await response.json(), "items")
-        parsed = await response.parse()
+        try:
+            parsed = await response.parse()
+            sdk = [_dict(row) for row in parsed.items]
+            sdk_error = None
+        except Exception as exc:
+            sdk, sdk_error = [], _error(exc, "/api/v2/traces/query:parse")
     result = {}
-    for source, traces in (("raw", raw), ("sdk", [_dict(row) for row in parsed.items])):
+    for source, traces in (("raw", raw), ("sdk", sdk)):
         result[source] = [{"root_id": _text((trace.get("root_run") or {}).get("id")),
                            "aggregates": _cost_summary(trace.get("trace_aggregates") or {})} for trace in traces]
+    if sdk_error:
+        result["sdk_error"] = sdk_error
     return result
 
 
@@ -150,7 +208,7 @@ def _pricing(client, model, price_model_id=None):
         params = {"limit": 100, "offset": offset}
         if provider:
             params["q"] = provider
-        page = rules.api_request(client, "GET", "/model-price-map/", params=params)
+        page = rules.api_request(client, "GET", "/model-price-map/", params=params, timeout=10)
         if not isinstance(page, list) or len(page) > 100:
             raise ValueError("Unexpected pricing page shape.")
         rows.extend(page)
@@ -174,7 +232,7 @@ def _pricing(client, model, price_model_id=None):
 
 
 def _rule_summary(client, project_id, predicate):
-    entries = rules.api_request(client, "GET", "/runs/rules", params={"session_id": project_id})
+    entries = rules.api_request(client, "GET", "/runs/rules", params={"session_id": project_id}, timeout=10)
     if not isinstance(entries, list) or len(entries) > 1000:
         raise ValueError("Unexpected rule list shape or size.")
     result = []
@@ -187,7 +245,7 @@ def _rule_summary(client, project_id, predicate):
                  "filter_matches_observed": rule.get("filter") == predicate}
         path = f"/runs/rules/{_uuid(rule['id'])}/logs"
         try:
-            logs = rules.api_request(client, "GET", path, params={"limit": 10})
+            logs = rules.api_request(client, "GET", path, params={"limit": 10}, timeout=10)
             if not isinstance(logs, list) or len(logs) > 10:
                 raise ValueError("Unexpected evaluator log page.")
             outcomes = [(log.get("evaluators") or {}).get("outcome") for log in logs]
@@ -203,7 +261,7 @@ async def _dashboard_summary(client, dashboard_id):
     report = {"id": dashboard_id}
     endpoint = f"/charts/section/{dashboard_id}"
     for label, body in (("without_window", {"omit_data": True}), ("bounded_window", analytics.section_read_body())):
-        result = await _capture(lambda: rules.api_request(client, "POST", endpoint, json=body), endpoint)
+        result = await _capture(lambda: rules.api_request(client, "POST", endpoint, json=body, timeout=10), endpoint)
         report[label] = ({"ok": True, "chart_ids": [
             _text(chart.get("id")) for chart in (result["result"].get("charts") or [])]}
             if result["ok"] else result)
@@ -211,7 +269,8 @@ async def _dashboard_summary(client, dashboard_id):
 
 
 async def collect_diagnostics(client, project, *, llm_run_id, since, until=None,
-                              dashboard_id=None, include_pricing=False):
+                              dashboard_id=None, include_pricing=False, observed_run=None,
+                              requested_filter=None, emit=None):
     """Read one known LLM/root and optional dashboard; never create or update resources."""
     project_id, llm_id = _uuid(project.id), _uuid(llm_run_id)
     if dashboard_id is not None:
@@ -220,25 +279,77 @@ async def collect_diagnostics(client, project, *, llm_run_id, since, until=None,
     until = _timestamp(until or datetime.now(timezone.utc))
     if until <= since:
         raise ValueError("The diagnostic end must follow its start.")
-    info = await _capture(lambda: rules.api_request(client, "GET", "/info"), "/info")
-    report = {"project_id": project_id, "workspace_id": _text(analytics.field(project, "tenant_id")),
+    def publish(section, value):
+        if emit is not None:
+            emit(section, value)
+
+    parsed_url = urlsplit(str(getattr(client, "api_url", "")))
+    host = parsed_url.hostname or ""
+    if ":" in host:
+        host = f"[{host}]"
+    if parsed_url.port is not None:
+        host += f":{parsed_url.port}"
+    safe_url = urlunsplit((parsed_url.scheme, host, parsed_url.path, "", ""))
+    report = {"diagnostics_version": DIAGNOSTICS_VERSION, "api_url": _text(safe_url),
+              "project_id": project_id, "workspace_id": _text(analytics.field(project, "tenant_id")),
               "llm_run_id": llm_id, "since": since.isoformat(), "until": until.isoformat(),
-              "sdk_version": version("langsmith"),
-              "server_version": _text(info["result"].get("version")) if info["ok"] else info}
+              "sdk_version": version("langsmith"), "requested_filter": _text(requested_filter),
+              "v2_probe_selects": analytics.RUN_FIELDS,
+              "query_paths": {"legacy": "/runs/query", "v2": "/api/v2/runs/query"}}
+    publish("scope", report.copy())
+    if observed_run is not None:
+        report["selected_payload"] = _payload_summary(observed_run)
+        publish("selected_payload", report["selected_payload"])
+    info = await _capture(lambda: rules.api_request(client, "GET", "/info", timeout=10), "/info")
+    if info["ok"]:
+        report["server_version"] = (_text(info["result"].get("version")) if isinstance(info["result"], dict)
+                                    else _error(DiagnosticResponseError("info object"), "/info"))
+    else:
+        report["server_version"] = info
+    publish("server_version", report["server_version"])
     if dashboard_id:
-        report["dashboard"] = await _dashboard_summary(client, dashboard_id)
-    legacy = await _capture(lambda: _legacy_runs(client, project_id, [llm_id], since, until), "/runs/query")
-    modern = await _capture(lambda: _modern_runs(client, project_id, [llm_id], since, until), "/api/v2/runs/query")
+        dashboard_result = await _capture(lambda: _dashboard_summary(client, dashboard_id), "/charts/section")
+        report["dashboard"] = dashboard_result["result"] if dashboard_result["ok"] else dashboard_result
+        publish("dashboard", report["dashboard"])
+    report["skill_probes"] = []
+
+    async def probe(label, predicate=None):
+        publish("probe_started", {"probe": label, "filter": _text(predicate)})
+
+        async def execute(backend, call):
+            result = await _capture(call, report["query_paths"][backend])
+            summary = _match_summary(result, llm_id, modern=backend == "v2")
+            publish("skill_probe", {"probe": label, "filter": _text(predicate),
+                                    "backend": backend, **summary})
+            return result, summary
+
+        old, new = await asyncio.gather(
+            execute("legacy", lambda: _legacy_runs(client, project_id, [llm_id], since, until, predicate)),
+            execute("v2", lambda: _modern_runs(client, project_id, [llm_id], since, until, predicate)),
+        )
+        report["skill_probes"].append({"probe": label, "filter": _text(predicate),
+                                       "legacy": old[1], "v2": new[1]})
+        return old[0], new[0]
+
+    legacy, modern = await probe("id only")
     run = (_one(legacy["result"], llm_id) if legacy["ok"] else None)
     if run is None and modern["ok"]:
-        run = _one(modern["result"]["sdk"], llm_id)
-    report["skill_probes"] = [{"probe": "id only", "legacy": _match_summary(legacy, llm_id),
-                               "v2": _match_summary(modern, llm_id, modern=True)}]
+        run = _one(modern["result"]["raw"], llm_id)
     if run is None:
         report["next_step"] = "The known run did not resolve. Check project, run ID, connection and fixed time bounds."
-        return report
+        publish("next_step", report["next_step"])
+        if observed_run is None:
+            return report
+        run = _dict(observed_run)
+        report["payload_source"] = "already loaded notebook run; ID-only queries did not resolve it"
+    else:
+        report["payload_source"] = "ID-only query"
+    publish("payload_source", report["payload_source"])
+    report["queried_payload"] = _payload_summary(run)
+    publish("queried_payload", report["queried_payload"])
     run = {**run, "run_type": (run.get("run_type") or "").lower()}
     report["model"] = {key: _text(analytics.metadata(run).get(key)) for key in MODEL_FIELDS}
+    publish("model", report["model"])
     has_skill = any(call["name"] == "Skill" for call in analytics.tool_calls(run))
     report["payload_has_skill_call"] = has_skill
     predicate = None
@@ -252,44 +363,95 @@ async def collect_diagnostics(client, project, *, llm_run_id, since, until=None,
         predicate = f'and(eq(run_type, "llm"), {key}, {value})'
         probes += [("output key", key), ("output value", value),
                    ("output pair", f"and({key}, {value})"), ("full Skill filter", predicate)]
+    if requested_filter and requested_filter != predicate:
+        probes.append(("actual notebook filter", requested_filter))
     for label, query in probes:
-        old = await _capture(lambda: _legacy_runs(client, project_id, [llm_id], since, until, query), "/runs/query")
-        new = await _capture(lambda: _modern_runs(client, project_id, [llm_id], since, until, query), "/api/v2/runs/query")
-        report["skill_probes"].append({"probe": label, "legacy": _match_summary(old, llm_id),
-                                       "v2": _match_summary(new, llm_id, modern=True)})
+        await probe(label, query)
 
     report["costs"] = {}
+    # Extra cost/pricing selects must not change the queries used to diagnose the
+    # original filter. Retain baseline evidence if a deployment rejects them.
+    detail = await _capture(lambda: _modern_runs(client, project_id, [llm_id], since, until,
+                                                 selects=RUN_SELECTS), "/api/v2/runs/query:cost-fields")
+    publish("cost_detail_query", _match_summary(detail, llm_id, modern=True))
+    if detail["ok"]:
+        detail_run = _one(detail["result"]["raw"], llm_id)
+        if detail_run is not None:
+            run = {**run, **{key: detail_run[key] for key in (*COST_FIELDS, "price_model_id") if key in detail_run}}
+            modern = detail
     for label, result in (("legacy LLM", legacy), ("v2 LLM", modern)):
         if result["ok"]:
             rows = result["result"] if label.startswith("legacy") else result["result"]["raw"]
             report["costs"][label] = [_cost_summary(row) for row in rows]
         else:
             report["costs"][label] = result
+        publish("costs: " + label, report["costs"][label])
     if modern["ok"]:
-        report["costs"]["SDK LLM"] = [_cost_summary(row) for row in modern["result"]["sdk"]]
+        report["costs"]["SDK LLM"] = modern["result"].get("sdk_error", [
+            _cost_summary(row) for row in modern["result"]["sdk"]])
+        publish("costs: SDK LLM", report["costs"]["SDK LLM"])
     trace_id = _uuid(run.get("trace_id") or llm_id)
     traces = await _capture(lambda: _trace_costs(client, project_id, trace_id, since, until), "/api/v2/traces/query")
     report["costs"]["trace"] = traces["result"] if traces["ok"] else traces
+    publish("costs: trace", report["costs"]["trace"])
     root_ids = {row["root_id"] for row in traces["result"]["raw"] if row.get("root_id")} if traces["ok"] else set()
     root_id = _uuid(next(iter(root_ids))) if len(root_ids) == 1 else trace_id
     report["costs"]["root_id_source"] = "trace response" if len(root_ids) == 1 else "assumed equal to trace_id; verify"
+    publish("root_scope", {"root_id": root_id, "trace_id": trace_id,
+                           "source": report["costs"]["root_id_source"]})
     roots = await _capture(lambda: _legacy_runs(client, project_id, [root_id], since, until), "/runs/query")
     report["costs"]["legacy root"] = [_cost_summary(row) for row in roots["result"]] if roots["ok"] else roots
+    publish("costs: legacy root", report["costs"]["legacy root"])
     v2_roots = await _capture(lambda: _modern_runs(client, project_id, [root_id], since, until), "/api/v2/runs/query")
     for source in ("raw", "sdk"):
         report["costs"][f"v2 root {source}"] = ([_cost_summary(row) for row in v2_roots["result"][source]]
                                                     if v2_roots["ok"] else v2_roots)
+        if source == "sdk" and v2_roots["ok"] and "sdk_error" in v2_roots["result"]:
+            report["costs"][f"v2 root {source}"] = v2_roots["result"]["sdk_error"]
+        publish(f"costs: v2 root {source}", report["costs"][f"v2 root {source}"])
     normalized = await _capture(lambda: analytics.query_turns(
         client, project, since=since, ids=[root_id], max_start_time=until, max_runs=1), "/api/v2/runs/query")
     report["costs"]["helper root"] = ([{"id": _text(row.get("id")),
                                           "trace_total_cost": _measurement(row, "trace_total_cost"),
                                           "root_total_cost": _measurement(row, "total_cost")}
                                          for row in normalized["result"]] if normalized["ok"] else normalized)
+    publish("costs: helper root", report["costs"]["helper root"])
     selected = await _capture(lambda: _rule_summary(client, project_id, predicate), "/runs/rules")
     report["skill_rules"] = selected["result"] if selected["ok"] else selected
+    publish("skill_rules", report["skill_rules"])
     if include_pricing:
         prices = await _capture(lambda: _pricing(client, report["model"], run.get("price_model_id")), "/model-price-map/")
         report["pricing"] = prices["result"] if prices["ok"] else prices
+        publish("pricing", report["pricing"])
+    return report
+
+
+async def print_diagnostics(client, project, *, llm_run, since, trigger, requested_filter=None,
+                            original_error=None, dashboard_id=None):
+    """Stream a bounded report into the current cell, including partial failures."""
+    def emit(section, value):
+        print(json.dumps({section: value}, indent=2, ensure_ascii=True), flush=True)
+
+    print("=== MODULE 06 DIAGNOSTICS BEGIN ===", flush=True)
+    emit("diagnostic_start", {"version": DIAGNOSTICS_VERSION, "trigger": trigger,
+                              "time_budget_seconds": REPORT_TIMEOUT_SECONDS,
+                              "instructions": "Wait for DIAGNOSTICS END, then export HTML with this cell output."})
+    report = None
+    try:
+        if original_error is not None:
+            emit("original_error", _error(original_error, "/notebook/" + trigger))
+        async with asyncio.timeout(REPORT_TIMEOUT_SECONDS):
+            report = await collect_diagnostics(
+                client, project, llm_run_id=analytics.field(llm_run, "id"), since=since,
+                observed_run=llm_run, requested_filter=requested_filter, dashboard_id=dashboard_id,
+                include_pricing=True, emit=emit,
+            )
+        emit("diagnostic_end", {"status": "finished", "note": "Individual probe errors are recorded above."})
+    except Exception as exc:
+        emit("diagnostic_end", {"status": "incomplete", "error": _error(exc, "/diagnostics"),
+                                "note": "Keep the partial results above; the original issue remains unresolved."})
+    finally:
+        print("=== MODULE 06 DIAGNOSTICS END ===", flush=True)
     return report
 
 

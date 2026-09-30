@@ -82,7 +82,21 @@ Prepared mode reads an existing project. It skips project creation, rule registr
 
 ## Read-only diagnostics
 
-If the Skill verification fails or every turn has missing cost, run this in a temporary notebook cell using the existing connection and the known Skill-calling LLM. Keep `since` fixed so it includes that run:
+### Retest and export
+
+1. Pull the complete updated repository, including `utils/`, and restart the notebook kernel.
+2. Rerun setup and confirm it prints **`Failure diagnostics: automatic (2026-09-30.1)`**. A stale helper version stops setup with a restart instruction.
+3. Run Section 2.2 normally. A failed query or missing Skill match automatically prints **`MODULE 06 DIAGNOSTICS BEGIN`**, then the exact scope, original error (if any), per-predicate legacy/V2 results, costs, model details, Skill rule state, and pricing candidates. Wait for **`MODULE 06 DIAGNOSTICS END`** before exporting. Diagnostic work is bounded to two minutes; each completed probe is printed immediately, and a timeout preserves the partial report.
+4. Continue the independent sections after any error. Both Skill registrations remain blocked until validation passes. Section 5.2 also prints a diagnostic report automatically if every sampled turn lacks cost, even if Skill validation succeeded. A real zero cost does not trigger it.
+5. Export the notebook **as HTML with all outputs**, including the setup version, diagnostic reports, and errors. No extra cells or terminal commands are required to capture these reports. Do not clear this retest export's outputs.
+
+Reports omit trace content, tool arguments, credentials, provider configurations, and raw error bodies. They record safe HTTP status, category, request ID, and error location when available. An individual failed probe remains visible while other probes continue. `finished` means collection finished; inspect individual probe errors too. `incomplete` means the time limit or an unexpected diagnostic failure stopped collection; share the partial report.
+
+Evaluator and dashboard API failures already print their method/path, HTTP status, safe category, and request ID when supplied by the server. Include those cell errors in the same export. Successful registration is separate from successful scoring; check feedback and evaluator execution logs before treating a rule as validated. The final pause cell must be run after final feedback arrives to verify cleanup.
+
+### Optional manual follow-up
+
+The automatic reports are sufficient for the initial retest. For a targeted follow-up, this temporary cell can also inspect an existing dashboard. Keep `since` fixed so it includes the selected run:
 
 ```python
 from utils.coding_agent_diagnostics import collect_diagnostics
@@ -155,15 +169,16 @@ The live path requires Claude activity between sections. Replay mode permits a n
 
 ### Final notebook release checklist
 
+- [ ] Before the final push, revisit [Claude plugin evals](https://code.claude.com/docs/en/plugin-evals): an optional capstone, importing results into LangSmith, and evaluating the evaluator. Decide whether to include this in the workshop or a follow-on lab.
 - [ ] Run every cell and audit its output. Remove diagnostic/debug output and redundant status messages or detail dumps from the normal notebook flow; keep each cell's essential instructional results clean and minimal.
-- [ ] Keep troubleshooting diagnostics explicitly optional and separate from the normal cell outputs.
+- [ ] Keep successful cell outputs minimal. Failures and wholly missing costs must automatically print diagnostic evidence in their cells; extra manual diagnostics are optional.
 - [ ] Clear saved cell outputs and execution counts before distributing the final notebook.
 
 ## Troubleshooting
 
 - **Wrong kernel:** select **Python (modular-workshop)** after registering it through `uv run python`; a system `python -m ipykernel` can register the wrong environment.
 - **Self-hosted setup error:** set both API and UI URLs in root `.env`, then rerun setup. Hostnames aren't restricted to SaaS.
-- **No Skill rows:** ask for the named skill in natural language, inspect the LLM output, then verify the indexed predicate. Retry after indexing; persistent failure needs the presenter's payload-indexing/path check. Don't silently broaden the selection judge to every LLM run.
+- **No Skill rows:** inspect the automatic Section 2.2 report. Compare ID-only, output-key, output-value, and full-filter probes across both APIs; distinguish indexing, routing, response shape, and SDK parsing before retrying. Don't silently broaden the selection judge to every LLM run.
 - **One MCP row:** the first table counts matching turns. The second counts actual tool executions; the smoke task should show two local MCP tools in one turn.
 - **One thread:** expected for one Claude session. Send another prompt in the same session for another turn, or start a new session for another thread. The helper supports `thread_id`, `session_id`, and `conversation_id` metadata.
 - **No traces:** use the printed launch command, check `/plugin`, and confirm the thread isn't muted. The launcher sets `TRACE_TO_LANGSMITH=true`.

@@ -25,6 +25,9 @@ from langsmith.utils import LangSmithNotFoundError
 from utils.langsmith_rules import api_request
 
 
+FAILURE_DIAGNOSTICS_VERSION = "2026-09-30.1"
+
+
 def field(obj, name, default=None):
     """Read SDK objects and JSON fixtures through the same small interface."""
     return obj.get(name, default) if isinstance(obj, dict) else getattr(obj, name, default)
@@ -287,18 +290,27 @@ def observed_call_path(run):
 
 async def verify_skill_filter(client, project, llm_run, filter, *, since):
     """A visible payload is not proof that the server indexed its tool calls."""
-    matches = await query_runs(client, project, since=since, ids=[str(field(llm_run, "id"))], filter=filter)
-    run_id = str(field(llm_run, "id"))
-    if not any(str(field(run, "id")) == run_id for run in matches):
-        raise ValueError(
-            "The observed Skill call did not match the server filter. Allow indexing time and retry. "
-            "If it persists, run the read-only diagnostics in the workshop README. "
-            "Skill evaluator registration is blocked until this check passes. "
-            "The raw trace still contains the call."
-        )
+    from utils.coding_agent_diagnostics import print_diagnostics
+
     if field(llm_run, "run_type", "").lower() != "llm" or not any(
             call["name"] == "Skill" for call in tool_calls(llm_run)):
         raise ValueError("Select an LLM run whose output contains a Skill call before verifying its filter.")
+    run_id = str(field(llm_run, "id"))
+    try:
+        matches = await query_runs(client, project, since=since, ids=[run_id], filter=filter)
+    except Exception as exc:
+        await print_diagnostics(client, project, llm_run=llm_run, since=since,
+                                trigger="skill-filter-query-error", requested_filter=filter, original_error=exc)
+        raise ValueError("Skill filter query failed. Automatic diagnostics are printed above. "
+                         "Export this cell's output as HTML. Skill evaluator registration remains blocked.") from None
+    if not any(str(field(run, "id")) == run_id for run in matches):
+        await print_diagnostics(client, project, llm_run=llm_run, since=since,
+                                trigger="skill-filter-no-match", requested_filter=filter)
+        raise ValueError(
+            "The observed Skill call did not match the server filter. Automatic diagnostics are printed above. "
+            "Export this cell's output as HTML. Skill evaluator registration remains blocked. "
+            "The raw trace contains the call; its indexing/query cause is not yet established."
+        )
     print("Skill filter matched the inspected LLM run.")
     return _skill_filter_scope(client, project, llm_run, filter, since)
 
@@ -464,6 +476,23 @@ def turn_metrics(traces, scores=None):
              "costed turns": len(row["known_costs"]),
              "mean quality": sum(row["scores"]) / len(row["scores"]) if row["scores"] else None,
              "scored turns": len(row["scores"])} for name, row in sorted(groups.items())]
+
+
+async def diagnose_missing_costs(client, project, traces, *, since):
+    """A missing measurement needs evidence even when no exception was raised."""
+    metrics = turn_metrics(traces)
+    if not metrics or any(row["costed turns"] for row in metrics):
+        return
+    print("All sampled turns lack cost. Collecting read-only diagnostics for one sampled LLM run.", flush=True)
+    llm_run = next((run for runs in traces.values() for run in runs
+                    if field(run, "run_type", "").lower() == "llm"), None)
+    if llm_run is None:
+        print("Cost diagnostics incomplete: no LLM run exists in the loaded sample. "
+              "Export this output and the trace table.", flush=True)
+        return
+    from utils.coding_agent_diagnostics import print_diagnostics
+
+    await print_diagnostics(client, project, llm_run=llm_run, since=since, trigger="missing-turn-costs")
 
 
 def ranked_bars(values, title, unit="", decimals=0):

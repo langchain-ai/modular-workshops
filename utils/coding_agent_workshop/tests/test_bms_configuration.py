@@ -137,9 +137,14 @@ class QueryTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_skill_rule_requires_server_match_not_just_payload(self):
         from unittest.mock import AsyncMock
-        with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[]):
-            with self.assertRaisesRegex(ValueError, "indexing"):
-                await analytics.verify_skill_filter(None, None, {"id": "skill-llm"}, "predicate", since="date")
+        llm = {"id": "skill-llm", "run_type": "llm", "outputs": {"messages": [
+            {"content": [{"type": "tool_call", "name": "Skill", "args": {}}]}]}}
+        with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[]), \
+                patch("utils.coding_agent_diagnostics.print_diagnostics", new_callable=AsyncMock) as report:
+            with self.assertRaisesRegex(ValueError, "Automatic diagnostics"):
+                await analytics.verify_skill_filter(None, None, llm, "predicate", since="date")
+        report.assert_awaited_once()
+        self.assertEqual(report.call_args.kwargs["trigger"], "skill-filter-no-match")
 
     async def test_query_consumes_all_pages_and_preserves_payloads(self):
         calls = []
