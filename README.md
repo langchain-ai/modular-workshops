@@ -77,7 +77,7 @@ Engine's first analysis takes ~20 minutes, so it's best primed before a session.
 
 ## Coding Agent Analytics (Module 6)
 
-[Module 6](modules/06_coding_agent_analytics.ipynb) traces Claude Code usage, labels skill invocations, evaluates turns and sessions, and compares skill/MCP usage, turn cost, and quality. It is standalone and automates evaluator and dashboard setup from the notebook.
+[Module 6](modules/06_coding_agent_analytics.ipynb) traces Claude Code usage, inspects and counts skill invocations, evaluates turns and sessions, and compares skill/MCP usage, turn cost, and quality. It is standalone and automates evaluator and dashboard setup from the notebook.
 
 The [pre-work guide](utils/coding_agent_workshop/README.md) covers the tracing plugin, supplied task plugin and local MCP, Azure/OpenAI hosted judges, and self-hosted API/UI settings. Each participant gets a separate project and dashboard. Recorded trace replay and a prepared-project mode provide checkpoints if setup falls behind. The sample Python task tracker has a seeded bug and tests; participants work in fresh copies. No additional Python dependencies are needed. The workshop takes about 85 minutes including a break.
 

@@ -1,92 +1,26 @@
 """Regressions from the September 29 export and the 0.16.65 read contract."""
 
-import ast
 import copy
 import io
 import json
 import unittest
 from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 import requests
 
 from utils import coding_agent_analytics as analytics
 from utils import langsmith_rules as rules
-from utils.coding_agent_workshop.tests.test_module06 import FakeClient, ROOT, llm_output, skill_call
-from utils.coding_agent_workshop.tests.test_failure_output import execute_cell
+from utils.coding_agent_workshop.tests.test_module06 import FakeClient, ROOT
 
 
 def notebook_cells():
     notebook = json.loads((ROOT / "modules/06_coding_agent_analytics.ipynb").read_text())
     return {cell["id"]: "".join(cell["source"]) for cell in notebook["cells"]}
-
-
-class SkillRegistrationTests(unittest.IsolatedAsyncioTestCase):
-    def setUp(self):
-        self.client = object()
-        self.project = SimpleNamespace(id="project")
-        self.llm = {"id": "llm", "run_type": "llm", **llm_output([skill_call("workshop:fix-bug")])}
-        self.since = datetime(2026, 9, 29, tzinfo=timezone.utc)
-
-    async def verify(self, predicate="filter"):
-        with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[self.llm]), \
-                redirect_stdout(io.StringIO()):
-            return await analytics.verify_skill_filter(self.client, self.project, self.llm, predicate, since=self.since)
-
-    async def test_validation_rejects_every_changed_scope(self):
-        verified = await self.verify()
-        args = [self.client, self.project, self.llm, "filter"]
-        analytics.require_skill_filter_validation(verified, *args, since=self.since)
-        replacements = [object(), SimpleNamespace(id="other"), {**self.llm, "id": "other"}, "other-filter"]
-        for index, replacement in enumerate(replacements):
-            changed = args.copy()
-            changed[index] = replacement
-            with self.subTest(scope=index), self.assertRaisesRegex(ValueError, "Section 2.2"):
-                analytics.require_skill_filter_validation(verified, *changed, since=self.since)
-        with self.assertRaises(ValueError):
-            analytics.require_skill_filter_validation(verified, *args, since=self.since + timedelta(seconds=1))
-
-    async def test_failed_notebook_rerun_invalidates_success_and_blocks_both_writes(self):
-        cells = notebook_cells()
-        api = Mock()
-        namespace = dict(analytics=analytics, rules=api, json=json, client=self.client, project=self.project,
-                         llm_run=self.llm, since=self.since, call_path="messages.content.name",
-                         activity_source="live", web_url="https://example.test", workshop_rules={},
-                         perform_eval=lambda run: {}, selection_prompt="prompt", selection_schema={},
-                         judge_model={}, agent_filter="root-filter", datetime=datetime,
-                         timezone=timezone, timedelta=timedelta)
-        namespace["skill_filter_validation"] = await self.verify()
-        code = compile(cells["m06-17"], "m06-17", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
-        with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[]):
-            with self.assertRaisesRegex(ValueError, "indexing"):
-                await eval(code, namespace)
-        self.assertIsNone(namespace["skill_filter_validation"])
-        for cell_id in ("m06-25", "m06-38"):
-            with self.subTest(cell=cell_id), self.assertRaisesRegex(ValueError, "Section 2.2"):
-                await execute_cell(cell_id, namespace)
-        self.assertFalse(api.mock_calls)
-
-        with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[self.llm]), \
-                patch.object(analytics, "query_turns", new_callable=AsyncMock, return_value=[]), \
-                patch.object(analytics, "show_runs"), redirect_stdout(io.StringIO()):
-            await eval(code, namespace)
-            api.ensure_code_evaluator.return_value = {"name": "skill", "id": "code", "url": "url"}
-            api.ensure_llm_evaluator.return_value = {"name": "selection", "id": "judge", "url": "url"}
-            for cell_id in ("m06-25", "m06-38"):
-                await execute_cell(cell_id, namespace)
-        api.ensure_code_evaluator.assert_called_once()
-        api.ensure_llm_evaluator.assert_called_once()
-
-    async def test_wrong_result_id_or_non_skill_payload_cannot_validate(self):
-        with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[{"id": "other"}]):
-            with self.assertRaises(ValueError):
-                await analytics.verify_skill_filter(self.client, self.project, self.llm, "filter", since=self.since)
-        negative = {"id": "llm", "run_type": "llm", **llm_output([])}
-        with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[negative]):
-            with self.assertRaisesRegex(ValueError, "contains a Skill"):
-                await analytics.verify_skill_filter(self.client, self.project, negative, "filter", since=self.since)
 
 
 class LegacySectionClient(FakeClient):
@@ -116,6 +50,55 @@ class DashboardRerunTests(unittest.TestCase):
         self.client = LegacySectionClient()
         self.project = SimpleNamespace(id="project", tenant_id="workspace", name="retest")
         self.spec = {"title": "Skill invocations", "metric": "run_count", "filter": 'in(trace_id, ["first"])'}
+
+    def test_dashboard_link_opens_one_day_without_changing_saved_charts(self):
+        dashboard = analytics.ensure_dashboard(self.client, self.project, "https://example.test")
+        url = urlsplit(dashboard["url"])
+        self.assertEqual(url.path, f"/o/workspace/dashboards/{dashboard['id']}")
+        self.assertEqual(json.loads(parse_qs(url.query)["timeModel"][0]), {"duration": "24h"})
+        self.assertEqual(self.client.charts, [])
+
+    def test_cost_and_quality_charts_select_roots_with_rolled_up_cost(self):
+        traces = {
+            "root-a": [{"id": "root-a", "run_type": "chain", "total_cost": 0.3, "trace_total_cost": 0.3},
+                       {"id": "llm-a", "run_type": "llm", "total_cost": 0.1},
+                       {"id": "llm-b", "run_type": "llm", "total_cost": 0.2},
+                       {"id": "skill", "run_type": "tool", "name": "Skill",
+                        "extra": {"metadata": {"ls_skill_name": "workshop:fix-bug"}}}],
+            "root-b": [{"id": "root-b", "run_type": "chain", "total_cost": None, "trace_total_cost": None}],
+        }
+        namespace = {"analytics": analytics, "json": json, "traces": traces}
+        with patch.object(analytics, "display_table"):
+            namespace["cohorts"] = analytics.cohort_filters(traces)
+            exec(compile(notebook_cells()["m06-60"], "m06-60", "exec"), namespace)
+        specs = {spec["metric"]: spec for spec in namespace["chart_specs"]}
+        costs = analytics.chart_series(self.client, self.project, specs["total_cost"])
+        quality = analytics.chart_series(self.client, self.project, specs["feedback_score_avg"])
+        self.assertEqual({series["name"]: series["filters"]["filter"] for series in costs}, {
+            "workshop:fix-bug": 'and(eq(is_root, true), in(id, ["root-a"]))',
+            "no_skill": 'and(eq(is_root, true), in(id, ["root-b"]))'})
+        self.assertEqual({series["name"]: series["filters"]["filter"] for series in quality}, {
+            "workshop:fix-bug": 'and(eq(is_root, true), in(id, ["root-a"]))',
+            "no_skill": 'and(eq(is_root, true), in(id, ["root-b"]))'})
+        self.assertTrue(all(series["filters"]["session"] == ["project"] for series in costs + quality))
+        self.assertTrue(all(series["feedback_key"] == "output_quality" for series in quality))
+        metrics = {row["skill group"]: row for row in analytics.turn_metrics(traces)}
+        self.assertEqual(metrics["workshop:fix-bug"]["total cost ($)"], 0.3)
+        self.assertIsNone(metrics["no_skill"]["total cost ($)"])
+
+    def test_cost_preview_distinguishes_numeric_cost_zero_and_empty_buckets(self):
+        spec = {"title": "Turn cost", "metric": "total_cost", "filter": 'in(trace_id, ["root-a"])'}
+        cases = [([], None, 0), ([None, None], None, 0), ([0], Decimal("0"), 1),
+                 ([0.1, 0.2, None], Decimal("0.3"), 2),
+                 ([float("nan"), float("inf"), True], None, 0)]
+        for values, expected, count in cases:
+            with self.subTest(values=values), \
+                    patch.object(analytics, "api_request", return_value={"data": [{"value": v} for v in values]}), \
+                    patch.object(analytics, "display_table"), redirect_stdout(io.StringIO()) as output:
+                result = analytics.preview_charts(self.client, self.project, [spec], datetime.now(timezone.utc))[0]
+            self.assertEqual(result["cost total ($)"], expected)
+            self.assertEqual(result["cost buckets"], count)
+            self.assertEqual("no numeric costs" in output.getvalue(), expected is None)
 
     def test_empty_then_populated_section_reproduces_old_failure_and_corrected_reruns(self):
         dashboard = analytics.ensure_dashboard(self.client, self.project, "https://example.test")
@@ -175,24 +158,6 @@ class DashboardRerunTests(unittest.TestCase):
         with self.assertRaises(rules.LangSmithRequestError) as caught:
             rules.api_request(client, "POST", "/charts/section/id")
         self.assertEqual(caught.exception.category, "chart-time-window")
-
-
-class FeedbackCoverageTests(unittest.TestCase):
-    def test_latest_zero_selection_score_counts_and_missing_feedback_is_visible(self):
-        runs = [{"id": name, "run_type": "llm", **llm_output([skill_call("workshop:fix-bug")])}
-                for name in ("scored", "unscored")]
-        runs.append({"id": "no-skill", "run_type": "llm", **llm_output([])})
-        feedback = [{"run_id": "scored", "key": "skill_name", "value": ["workshop:fix-bug"], "created_at": "1"},
-                    {"run_id": "scored", "key": "skill_selection", "score": 1, "created_at": "1"},
-                    {"run_id": "scored", "key": "skill_selection", "score": 0, "created_at": "2"}]
-        with patch.object(analytics, "display_table"), redirect_stdout(io.StringIO()) as output:
-            rows = analytics.show_skill_feedback(runs, feedback)
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0]["skill_selection"], 0)
-        self.assertEqual(rows[0]["feedback"], "complete")
-        self.assertIsNone(rows[1]["skill_selection"])
-        self.assertIn("skill_selection", rows[1]["feedback"])
-        self.assertIn("eligibility", output.getvalue())
 
 
 if __name__ == "__main__":

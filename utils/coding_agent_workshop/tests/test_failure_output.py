@@ -1,4 +1,4 @@
-"""Exercise the real notebook cells and reports, with only network I/O replaced."""
+"""Exercise notebook cost cells and optional read-only reports with offline I/O."""
 
 import ast
 import asyncio
@@ -118,8 +118,8 @@ class FailureFixture:
         return dict(analytics=analytics, rules=Mock(), json=json, client=self.client, project=self.project,
                     llm_run=self.llm, since=self.since, call_path="messages.content.name",
                     activity_source="live", web_url="https://example.test", workshop_rules={},
-                    skill_filter_validation="stale success", agent_filter="root-filter", traces=self.traces,
-                    perform_eval=lambda run: {}, selection_prompt="prompt", selection_schema={}, judge_model={},
+                    agent_filter="root-filter", root_filter="root-filter", traces=self.traces,
+                    judge_model={},
                     datetime=datetime, timezone=timezone, timedelta=timedelta)
 
 
@@ -135,10 +135,14 @@ class FailureOutputTests(unittest.IsolatedAsyncioTestCase):
         namespace = fixture.namespace()
         with fixture.patches(), redirect_stdout(io.StringIO()) as output:
             with self.assertRaisesRegex(ValueError, "Automatic diagnostics"):
-                await execute_cell("m06-17", namespace)
+                await analytics.verify_skill_filter(
+                    fixture.client, fixture.project, fixture.llm,
+                    'and(eq(run_type, "llm"), eq(output_key, "messages.content.name"), eq(output_value, "Skill"))',
+                    since=fixture.since,
+                )
         return namespace, output.getvalue()
 
-    async def test_actual_failure_cell_prints_all_probes_and_blocks_both_registrations(self):
+    async def test_optional_index_diagnostic_prints_all_probes_without_writes(self):
         fixture = FailureFixture()
         namespace, output = await self.run_failure(fixture)
         for expected in ("DIAGNOSTICS BEGIN", "DIAGNOSTICS END", "skill-filter-no-match", PROJECT, LLM,
@@ -148,10 +152,6 @@ class FailureOutputTests(unittest.IsolatedAsyncioTestCase):
                          "sdk_matched", "costs: trace", "skill_rules", "pricing", '"status": 403', REQUEST_ID):
             self.assertIn(expected, output)
         self.assertNotIn("PRIVATE-", output)
-        self.assertIsNone(namespace["skill_filter_validation"])
-        for cell in ("m06-25", "m06-38"):
-            with self.assertRaisesRegex(ValueError, "Section 2.2"):
-                await execute_cell(cell, namespace)
         self.assertFalse(namespace["rules"].mock_calls)
         legacy = [kwargs["json"] for method, path, kwargs in fixture.calls if path == "/runs/query"]
         modern = [kwargs for method, path, kwargs in fixture.calls if path == "/api/v2/runs/query"]
@@ -191,24 +191,31 @@ class FailureOutputTests(unittest.IsolatedAsyncioTestCase):
         fixture = FailureFixture()
         fixture.primary_matches = True
         with fixture.patches(), patch.object(analytics, "show_runs"), redirect_stdout(io.StringIO()) as output:
-            namespace = fixture.namespace()
-            await execute_cell("m06-17", namespace)
-        self.assertIsNotNone(namespace["skill_filter_validation"])
+            result = await analytics.verify_skill_filter(
+                fixture.client, fixture.project, fixture.llm, 'eq(output_value, "Skill")', since=fixture.since,
+            )
+        self.assertIsNotNone(result)
         self.assertIn("Skill filter matched", output.getvalue())
         self.assertNotIn("DIAGNOSTICS", output.getvalue())
         self.assertFalse(fixture.calls)
 
-    async def test_missing_cost_cell_runs_diagnostics_independently_of_skill_validation(self):
-        fixture = FailureFixture()
-        namespace = fixture.namespace()
-        namespace["skill_filter_validation"] = None
-        with fixture.patches(), patch.object(analytics, "ranked_bars"), patch.object(analytics, "display_table"), \
-                redirect_stdout(io.StringIO()) as output:
-            await execute_cell("m06-57", namespace)
-        self.assertIn("missing-turn-costs", output.getvalue())
-        self.assertIn("costs: helper root", output.getvalue())
-        self.assertIn("pricing", output.getvalue())
-        self.assertIn("DIAGNOSTICS END", output.getvalue())
+    async def test_cost_cell_preserves_missing_zero_and_mixed_coverage_without_diagnostic_io(self):
+        for scenario, total, costed, turns in (("missing", None, 0, 1), ("zero", 0, 1, 1), ("mixed", 0.5, 1, 2)):
+            fixture = FailureFixture()
+            if scenario == "zero":
+                fixture.root["trace_total_cost"] = 0
+            elif scenario == "mixed":
+                fixture.traces["priced"] = [{"id": "priced", "trace_total_cost": 0.5}]
+            namespace = fixture.namespace()
+            with self.subTest(scenario=scenario), fixture.patches(), \
+                    patch.object(analytics, "ranked_bars"), patch.object(analytics, "display_table") as table, \
+                    patch.object(diagnostics, "print_diagnostics", side_effect=AssertionError("No automatic report")), \
+                    redirect_stdout(io.StringIO()) as output:
+                await execute_cell("m06-57", namespace)
+            self.assertEqual(namespace["metrics"][0]["total cost ($)"], total)
+            self.assertEqual(table.call_args.args[0], [{"skill group": "no_skill", "turns": turns, "costed turns": costed}])
+            self.assertEqual(output.getvalue(), "")
+            self.assertFalse(fixture.calls)
 
     async def test_known_zero_cost_does_not_trigger_diagnostics(self):
         fixture = FailureFixture()
@@ -266,7 +273,6 @@ class FailureOutputTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"status": "incomplete"', output)
         self.assertIn("TimeoutError", output)
         self.assertIn("DIAGNOSTICS END", output)
-        self.assertIsNone(namespace["skill_filter_validation"])
 
     async def test_unexpected_diagnostic_failure_prints_safe_location_and_original_guard(self):
         fixture = FailureFixture()
@@ -276,14 +282,6 @@ class FailureOutputTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn('"location"', output)
         self.assertIn('"status": "incomplete"', output)
         self.assertNotIn("PRIVATE-", output)
-        self.assertIsNone(namespace["skill_filter_validation"])
-
-    async def test_setup_detects_old_imported_helpers(self):
-        with patch.object(analytics, "FAILURE_DIAGNOSTICS_VERSION", "old"), \
-                patch("dotenv.load_dotenv") as load:
-            with self.assertRaisesRegex(RuntimeError, "restart the kernel"):
-                await execute_cell("m06-03", {})
-        load.assert_not_called()
 
     async def test_unexpected_response_shape_is_not_reported_as_no_match(self):
         fixture = FailureFixture()

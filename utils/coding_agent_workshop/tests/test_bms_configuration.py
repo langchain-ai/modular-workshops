@@ -135,7 +135,7 @@ class QueryTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(analytics.turn_cost(roots[0]), 2.17)
         self.assertIsNone(analytics.turn_cost(roots[1]))
 
-    async def test_skill_rule_requires_server_match_not_just_payload(self):
+    async def test_optional_index_diagnostic_requires_server_match_not_just_payload(self):
         from unittest.mock import AsyncMock
         llm = {"id": "skill-llm", "run_type": "llm", "outputs": {"messages": [
             {"content": [{"type": "tool_call", "name": "Skill", "args": {}}]}]}}

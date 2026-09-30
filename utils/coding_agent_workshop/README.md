@@ -2,9 +2,36 @@
 
 Open [`06_coding_agent_analytics.ipynb`](../../modules/06_coding_agent_analytics.ipynb). It stands alone; Module 4 is an optional reference.
 
+## Approved BMS delivery scope — October 1
+
+For the October 1 workshop, the notebook focuses on local Skill extraction and three hosted root/thread evaluators. Hosted Skill labeling and selection scoring have been removed; no manual skips are needed.
+
+Keep the main story: **observe a coding session, identify Skill/MCP activity, evaluate useful results, and compare usage, measured cost, and quality**. Finish with CLI inspection.
+
+| Area | Current notebook |
+|---|---|
+| Tracing and skills | Inspect the model output, extract names locally in 3.1, query actual Skill/MCP tool spans and their parent turns, and inspect Threads |
+| Hosted evaluation | Three rules: `output_quality`, `task_completion`, and `session_outcome`; session outcome is now 3.5 |
+| Removed | Hosted `skill_name` labeling, `skill_selection` scoring, their output-index validation/fallback, and the old feedback-comparison tables |
+| Exercise | Both supplied skills, local MCP tools, TASK-001 fix/review, and TASK-002 review/correction remain |
+| Analysis and dashboards | Keep all three custom charts and participant dashboard creation: Skill invocations, total turn cost, mean turn quality; notebook comparison is now 5.1, dashboard creation 5.2, and MCP tools 5.3 |
+| Terminal | CLI trace list, thread get, and the trace-analysis prompt remain |
+
+Local extraction teaches how the requested skill appears in model output. Hosted decision-level suitability scoring is deferred. Usage counts and cost/quality groups read actual tool spans and root feedback; they require neither removed feedback key.
+
+**Cost fallback:** the native cost chart was still blank at the end of the call despite priced traces. Keep chart creation and notebook cost coverage. If the native chart stays empty, show notebook costs/coverage and continue; one blank chart is acceptable for delivery.
+
+**Recovery:** replay now requires the three retained evaluator names and has no output-index requirement. It still needs BMS verification. Prepared mode reads a verified existing project and skips writes; the presenter supplies both-skill activity, root/session feedback, known costs, and charts. Presenter follow-along remains the agreed setup fallback.
+
+**Reused rehearsal projects:** removing cells does not disable rules already on BMS. Before reusing a project, the facilitator should inspect and pause its exact `module06-skill-name` and `module06-skill-selection` rule IDs separately. The notebook's final cell pauses only IDs successfully registered in the current kernel, including partial registration. It does not search for or disable other rules.
+
+**Final rehearsal:** restart the kernel, run the three registrations, exercise both skills and TASK-002, wait for root/session feedback, save charts twice, check the date range and notebook cost coverage, run CLI cells, then pause the three registered IDs. Rerun registration after a kernel restart to recover the same IDs. Confirm ordinary Editor access before delivery.
+
+The notebook keeps its 85-minute agenda, with time freed in the evaluator block for questions and setup recovery. For 80 minutes, shorten dashboard discussion by five minutes. Keep plugin evals, remote/BMS connectors, Chat, custom plugins, and newer-dashboard experiments as follow-on material; no new integrations are needed for this cut.
+
 ## Participant pre-work
 
-1. Clone this repository. From its root, run:
+1. Clone this repository and, for the October 1 BMS workshop, check out **`avi/coding-agent-analysis`**. Use the final revision shared by the presenter and pull the full repository, including `utils/`. From its root, run:
 
    ```bash
    uv sync
@@ -65,85 +92,38 @@ Replay uses the [reviewed recording](fixtures/README.md): five genuine turns fro
 
 Replay assigns new run/thread IDs per target project and persists its attempt in ignored `.module06/replay/`. Keep that state when resuming after a kernel restart or interrupted upload. Completed stages are skipped. To run a separate rehearsal, use a new participant ID/project; don't delete state midway through an attempt.
 
-The smoke turn is uploaded before evaluators, so it normally has no evaluation. Upload usage only after all five rules are enabled. Rules select newly received runs even though recorded timestamps are shifted into the recent past. Thread feedback still waits for real inactivity after ingestion. If usage was already uploaded with rules disabled, use a new project for a new rehearsal or arrange an explicit backfill with the presenter.
+The smoke turn is uploaded before evaluators, so it normally has no evaluation. Upload usage only after all three rules are enabled. Rules select newly received runs even though recorded timestamps are shifted into the recent past. Thread feedback still waits for real inactivity after ingestion. If usage was already uploaded with rules disabled, use a new project for a new rehearsal or arrange an explicit backfill with the presenter.
 
-Prepared mode reads an existing project. It skips project creation, rule registration, thread-setting updates, dashboard writes, replay, and cleanup. The presenter supplies populated traces, feedback, and a dashboard; participants can still build notebook rankings and preview the chart queries.
+Prepared mode reads an existing project. It skips project creation, rule registration, thread-setting updates, dashboard writes, replay, and cleanup. The presenter supplies populated traces, feedback, and a dashboard; participants can still build notebook rankings and open the existing dashboard.
 
 ## Presenter preparation
 
 1. Verify the target deployment and an ordinary **Editor** account. The BMS dry run used self-hosted **0.16.65**. Its source supports the selected query/rule contracts, but its feature flags, custom permissions, network access, and provider configuration must be tested on that instance. Don't use workspace admin as the default workaround. Creating/rotating workspace secrets is a facilitator operation requiring secret-management permission.
-2. Check the notebook's API/UI URLs, participant project, local MCP, and smoke prompt. In 2.2, confirm the observed LLM output path matches the server's indexed filter. A visible raw payload doesn't prove it was indexed. Children need not carry the root's integration metadata.
-3. Verify all five rules on incoming turns: categorical `skill_name`, root quality/completion, numeric LLM selection, and session outcome after inactivity. Open the semantic `?tab=evaluators` link. If an old UI doesn't honor it, click **Evaluators** from the project.
+2. Check the notebook's API/UI URLs, participant project, local MCP, and smoke prompt. In 2.2, compare actual Skill/MCP execution rows with the containing root turns. These queries use tool type/name; output-content indexing is not a workshop prerequisite.
+3. Verify the three hosted rules on incoming activity: root quality/completion and session outcome after inactivity. Open the semantic `?tab=evaluators` link. If an old UI doesn't honor it, click **Evaluators** from the project.
 4. Keep a prepared project with a genuine recorded session, populated feedback, and a dashboard. Rehearse both recovery checkpoints from a fresh kernel. One recorded session has one thread; multiple turns do not imply multiple threads. Use a separate replay project to test isolation.
-5. Preview and save the legacy dashboard on self-hosted, then save again, including after a kernel restart. The SaaS v2 conversion endpoint is not assumed available on 0.16.65. Check stable dashboard/chart IDs, invocation totals, measured whole-trace costs, and numeric quality scores against the notebook. Each native series uses the same sampled trace/root IDs; rerun analysis and chart cells after new activity.
+5. Save the legacy dashboard on self-hosted, then save again, including after a kernel restart. The SaaS v2 conversion endpoint is not assumed available on 0.16.65. Check stable dashboard/chart IDs, invocation totals, measured whole-trace costs, and numeric quality scores against the notebook. Each native series uses the same sampled trace/root IDs; rerun analysis and chart cells after new activity.
 6. Verify CLI access. Remote MCP on self-hosted 0.16+ additionally needs hostname/signing configuration and reachability to `/api/mcp`; see the [setup guide](https://docs.langchain.com/langsmith/langsmith-remote-mcp#self-hosted-langsmith). LangSmith Chat is optional.
 7. Have BMS validate its M365 connector on an approved demo mailbox. The notebook prompt only reads. Jira is an alternative for users with access; neither connector is required for the local exercise. Never capture real employee messages into the shared workshop fixture.
 8. After final feedback lands, pause the workshop rules. Partial registration is recorded incrementally, so cleanup also works after a later registration failure. A fresh kernel must rerun registration to recover those IDs, or the presenter can pause the named rules in the UI.
 
-## Read-only diagnostics
+## Final rehearsal
 
-### Retest and export
+1. Pull the full repository on `avi/coding-agent-analysis`, restart the kernel, and rerun setup.
+2. Inspect Skill/MCP executions and their parent turns. Run the short local Skill extraction example.
+3. Register the three judges; run the fix/review and TASK-002 follow-up tasks. Confirm `output_quality`, `task_completion`, and `session_outcome` after processing and thread inactivity.
+4. Check Skill/MCP counts, known costs and scored-turn coverage. Missing cost stays unknown; a recorded zero remains valid.
+5. Save the three custom charts, inspect the time range, and save again to confirm reuse. A blank native cost chart is acceptable if notebook costs are available. Investigate remaining chart issues separately from the attendee flow.
+6. Run the CLI cells, wait for final feedback, and pause the exact registered IDs. Inspect obsolete Skill rules separately in reused projects.
+7. Export the completed rehearsal as HTML for review. Clear outputs and execution counts in the distributed notebook.
 
-1. Pull the complete updated repository, including `utils/`, and restart the notebook kernel.
-2. Rerun setup and confirm it prints **`Failure diagnostics: automatic (2026-09-30.2)`**. A stale helper version stops setup with a restart instruction. The early cost check inspects up to two unpriced recent turns before Skill validation, even when other turns already have costs.
-3. Run Section 2.2 normally. A failed query or missing Skill match automatically prints **`MODULE 06 DIAGNOSTICS BEGIN`**, then the exact scope, original error (if any), per-predicate legacy/V2 results, costs, model details, Skill rule state, and pricing candidates. Wait for **`MODULE 06 DIAGNOSTICS END`** before exporting. Diagnostic work is bounded to two minutes; each completed probe is printed immediately, and a timeout preserves the partial report.
-4. If only output-content matching fails, Section 2.2 verifies a structural Claude Code LLM selector and prints **`Skill evaluation mode: feedback`**. The deterministic code evaluator reads raw outputs; the hosted judge uses successful `skill_name` feedback. Request failures or failed structural validation still block registration. The underlying deployment indexing issue remains open.
-5. In feedback mode, run Section 3.1, then execute the **new inspection prompt printed by that cell** in the same Claude Code session. Continue to Section 3.5 after it finishes. That cell waits up to 90 seconds for the fresh decision's labels, checks the actual labels and raw Skill call, and verifies the exact run against the feedback filter before updating the hosted judge. If pending, inspect the code evaluator logs and rerun Section 3.5. Existing rule updates do not backfill the earlier inspection. Use live activity for this fallback; recorded replay still requires working output indexing.
-6. After all five rules register, run the Section 4 tasks and check both `skill_name` and `skill_selection` on the new decisions in Section 5.1. The bootstrap inspection establishes eligibility; these later turns establish hosted judge execution. Section 5.2 now diagnoses **any** unpriced turns, selecting an LLM from an unpriced turn and preferring missing cost with token usage. A recorded zero stays valid.
-7. Export the notebook **as HTML with all outputs**, including the setup version, diagnostic reports, registration results, and feedback. No manual diagnostic cell is required. Do not clear this retest export's outputs.
+The attendee notebook displays instructional results and normal actionable errors. Diagnostic reports, pricing probes, chart-query previews and resource-ID dumps are outside its execution path. Three rules and all three charts are retained.
 
-Reports omit trace content, tool arguments, credentials, provider configurations, and raw error bodies. They record safe HTTP status, category, request ID, and error location when available. An individual failed probe remains visible while other probes continue. `finished` means collection finished; inspect individual probe errors too. `incomplete` means the time limit or an unexpected diagnostic failure stopped collection; share the partial report.
-
-Evaluator and dashboard API failures already print their method/path, HTTP status, safe category, and request ID when supplied by the server. Include those cell errors in the same export. Successful registration is separate from successful scoring; check feedback and evaluator execution logs before treating a rule as validated. The final pause cell must be run after final feedback arrives to verify cleanup.
-
-### Optional manual follow-up
-
-The automatic reports are sufficient for the initial retest. For a targeted follow-up, this temporary cell can also inspect an existing dashboard. Keep `since` fixed so it includes the selected run:
-
-```python
-from utils.coding_agent_diagnostics import collect_diagnostics
-
-diagnostic_report = await collect_diagnostics(
-    client, project, llm_run_id=analytics.field(llm_run, "id"), since=since,
-    dashboard_id=dashboard["id"] if globals().get("dashboard") else None,
-    include_pricing=True,
-)
-print(json.dumps(diagnostic_report, indent=2))
-```
-
-The report compares the exact run through legacy and V2 queries, decomposes the Skill predicate, and compares cost fields before and after SDK/helper normalization. It includes model/provider/plugin versions, the two Skill rules' enabled/filter state, and recent execution-outcome counts. The legacy log reader accepts the extra pagination row and summarizes the requested ten. It excludes prompts, responses, tool arguments, provider configurations, and credentials. Pricing uses a bounded **unfiltered listing** so provider-null maps are visible, reports incomplete coverage, and identifies the recorded price UUID when found. Candidate rows alone do not establish a pricing match; the facilitator checks model/provider/date, rates, and cache-token pricing in the UI.
-
-For a fresh terminal, run from the repository root with the actual IDs and a timestamp containing the original run:
-
-```bash
-.venv/bin/python -m utils.coding_agent_diagnostics \
-  --project '<exact participant project name>' \
-  --llm-run-id '<Skill-calling LLM UUID>' \
-  --since '<ISO timestamp with timezone>' \
-  --dashboard-id '<existing dashboard UUID>' \
-  --include-pricing
-```
-
-The CLI loads the root `.env` and reads an existing project. Omit `--dashboard-id` if no dashboard has been created. Neither invocation changes rules, traces, prices, or dashboards. The optional dashboard check compares the old read request with a bounded one-minute read; it may deliberately record the old HTTP 404. Share the report with the presenter and deployment owner.
-
-Interpret the report in order:
-
-1. **ID-only lookup fails:** check project, ID, connection, and time bounds first.
-2. **ID resolves but output probes fail on both APIs:** inspect payload indexing on the deployment. On the 0.16.65 ClickHouse path, check `FF_CH_SEARCH_ENABLED` and the indexed pairs on ingest workers. Raw outputs can exist without searchable pairs. Validate a configuration correction with new activity.
-3. **Legacy matches but V2 fails:** investigate query routing/compatibility before changing the expression.
-4. **Filter matches but feedback is missing:** inspect the two Skill rules and their execution logs, then generate a fresh completed Skill turn after both rules register. Section 5.1 checks both `skill_name` and `skill_selection`; the pre-registration smoke turn normally has neither. Do not bypass the registration gate.
-5. **Raw LLM costs are absent:** check the actual Claude model/provider, usage metadata and price mapping. Azure judge pricing is a separate concern. If raw costs exist but normalized values disappear, compare root IDs and response fields. Pricing edits do not recalculate old traces; test new activity. Unknown cost remains unknown.
-6. **Dashboard without dates fails but bounded read succeeds:** this matches the 0.16.65 populated-section time-window behavior. The updated save helper supplies dates. A genuine missing dashboard remains an error; recreating it can introduce duplicates.
-
-After correction, exercise both workshop skills and verify all five feedback types. Save the dashboard twice and reconnect in a fresh kernel to verify the same IDs are reused. Wait for final feedback, then run the exact-ID pause cell.
-
-The feedback workaround is supported by the pinned 0.16.65 source: [feedback-triggered rule eligibility](https://github.com/langchain-ai/langchainplus/blob/cda0e08d9c0af248dee8ee96bbca3186cee70962/smith-backend/app/models/run_rules/data_source.py#L197), [paired feedback-value filtering](https://github.com/langchain-ai/langchainplus/blob/cda0e08d9c0af248dee8ee96bbca3186cee70962/smith-backend/app/tests/api/test_group.py#L4438), and [empty-list label handling](https://github.com/langchain-ai/langchainplus/blob/cda0e08d9c0af248dee8ee96bbca3186cee70962/smith-backend/app/models/runs/utils.py#L265). Preserve the same rule IDs to retain application deduplication. Code labeling covers Claude Code LLM spans in this participant project; the hosted judge remains limited to successful Skill labels. BMS execution must still be confirmed by the fresh-turn checks above.
-
-### Capacity for 40–60 attendees
+## Capacity for 40–60 attendees
 
 Use a separate project per participant, even within one shared workspace. Confirm project/rule/chart permissions, trace-ingestion limits, evaluator-worker capacity, Azure/APIM requests-per-minute and tokens-per-minute limits, and any workspace spending limits with the deployment owner.
 
-The recorded exercise contributes **78 runs and five rules per participant**: 3,120 runs/200 rules for 40 people, or 4,680 runs/300 rules for 60. Its four evaluated turns normally request 12 run-level LLM judgments and one idle-thread judgment: roughly 520 or 780 LLM calls respectively, plus model-validation requests and any extra turns. Long conversations can raise token usage substantially. Replay ingestion is faster than live typing, so avoid asking the entire room to replay simultaneously.
+The recorded exercise contributes **78 runs and three rules per participant**: 3,120 runs/120 rules for 40 people, or 4,680 runs/180 rules for 60. Its four evaluated turns normally request eight run-level LLM judgments and one idle-thread judgment: roughly 360 or 540 LLM calls respectively, plus model-validation requests and any extra turns. Long conversations can raise token usage substantially. Replay ingestion is faster than live typing, so avoid asking the entire room to replay simultaneously.
 
 Start with one Editor, then a small agreed cohort (for example five attendees). Stagger evaluator registration and activity; monitor queue age, 429s, provider quota, and feedback latency. If queues grow, stop adding turns, let the queue drain, and use the prepared-project checkpoint. Don't run an uncoordinated 40-person load test. A single SaaS rehearsal cannot establish BMS capacity.
 
@@ -173,24 +153,24 @@ The live path requires Claude activity between sections. Replay mode permits a n
 
 ### Final notebook release checklist
 
-- [ ] Before the final push, revisit [Claude plugin evals](https://code.claude.com/docs/en/plugin-evals): an optional capstone, importing results into LangSmith, and evaluating the evaluator. Decide whether to include this in the workshop or a follow-on lab.
-- [ ] Run every cell and audit its output. Remove diagnostic/debug output and redundant status messages or detail dumps from the normal notebook flow; keep each cell's essential instructional results clean and minimal.
-- [ ] Keep successful cell outputs minimal. Failures and partially or wholly missing costs must automatically print diagnostic evidence in their cells; extra manual diagnostics are optional.
-- [ ] Clear saved cell outputs and execution counts before distributing the final notebook.
+- [ ] Keep [Claude plugin evals](https://code.claude.com/docs/en/plugin-evals), importing results into LangSmith, and evaluating the evaluator in the follow-on lab under the recommended October 1 scope; add no new integration for tomorrow.
+- [ ] Rehearse every cell on BMS and review its output. Automatic diagnostics and redundant resource tables have been removed locally; keep the remaining instructional results concise.
+- [x] Remove automatic diagnostic reports, version banners, chart previews and duplicate resource tables from the attendee flow. Preserve real errors and missing-data coverage; facilitator diagnostics are manual.
+- [x] Clear saved cell outputs and execution counts in the final notebook; clear again if the distributable copy is used for rehearsal.
 
 ## Troubleshooting
 
 - **Wrong kernel:** select **Python (modular-workshop)** after registering it through `uv run python`; a system `python -m ipykernel` can register the wrong environment.
 - **Self-hosted setup error:** set both API and UI URLs in root `.env`, then rerun setup. Hostnames aren't restricted to SaaS.
-- **No Skill rows:** inspect the automatic Section 2.2 report. Compare ID-only, output-key, output-value, and full-filter probes across both APIs; distinguish indexing, routing, response shape, and SDK parsing before retrying. Don't silently broaden the selection judge to every LLM run.
+- **No Skill rows:** confirm the selected project/time window and inspect the trace for a tool span named `Skill`. Ask Claude to invoke the supplied skill by name, then refresh. Parent-turn rows and tool execution rows count different units. No hosted Skill feedback is needed.
 - **One MCP row:** the first table counts matching turns. The second counts actual tool executions; the smoke task should show two local MCP tools in one turn.
 - **One thread:** expected for one Claude session. Send another prompt in the same session for another turn, or start a new session for another thread. The helper supports `thread_id`, `session_id`, and `conversation_id` metadata.
 - **No traces:** use the printed launch command, check `/plugin`, and confirm the thread isn't muted. The launcher sets `TRACE_TO_LANGSMITH=true`.
 - **Saved tracing key conflict:** the launcher reports the settings path and variable name. Resolve the saved override so the root `.env` can supply the key. Restore temporary global configuration changes after testing.
 - **Evaluator registration fails:** the helper reports the operation, HTTP status, safe category, and request ID when available. `401` means authentication; `403` requires checking workspace/operation permissions; `400/422` can indicate a missing hosted secret or invalid provider/model configuration; `404` can indicate an unsupported path; `429` means rate limiting. Share these diagnostics with the deployment owner, who can inspect server logs. Avoid sharing raw bodies or credentials.
-- **Rule exists but feedback fails:** check the evaluator's execution error and provider connectivity from LangSmith workers. Successful code evaluation doesn't validate Azure credentials or model settings.
-- **Missing feedback:** allow indexing, model processing, and the configured thread-idle interval. Only `output_quality` and `skill_selection` are numeric; the other feedback keys are text. `insufficient_evidence` is a valid result, not an execution error.
+- **Rule exists but feedback fails:** check the evaluator's execution error and provider connectivity from LangSmith workers. Local skill-name extraction does not validate Azure credentials or model settings.
+- **Missing feedback:** allow indexing, model processing, and the configured thread-idle interval. Only `output_quality` is numeric; `task_completion` and `session_outcome` are text. `insufficient_evidence` is a valid result, not an execution error.
 - **Missing custom charts:** open the printed dashboard link or select `Module 06 — <project name>`. Include the trace timestamps in the time range. Choose **Prebuilt → Tools** for the built-in tool charts.
-- **Feedback exists but the quality chart is blank:** chart aggregates can lag the feedback table. The preview reports numeric feedback sample counts; rerun it after processing catches up. Don't rewrite or duplicate feedback to fill the chart.
+- **Feedback exists but the quality chart is blank:** chart aggregates can lag the feedback table. Check the notebook's scored-turn counts, allow processing time, then refresh the dashboard. Don't rewrite or duplicate feedback to fill the chart.
 - **Totals differ:** align the time window and sample. Root cost semantics differ between native and legacy query backends, so notebook turn costs use the explicit trace aggregate. Never sum an aggregate root with its children. Missing costs/scores remain missing. Rerun analysis and chart cells after additional activity.
 - **Query exceeds its bound:** narrow `since` or intentionally raise the limit. The helpers raise instead of silently truncating totals.

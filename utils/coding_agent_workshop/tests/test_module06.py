@@ -62,8 +62,8 @@ class ConfigurationTests(unittest.TestCase):
                      "analytics": helpers, "rules": Mock(), "web_url": "https://example.test", "os": os,
                      "plugin_root": ROOT, "root": {}, "replay": Mock()}
         with redirect_stdout(io.StringIO()):
-            for cell_id in ("m06-06", "m06-07", "m06-09", "m06-replay-smoke", "m06-25", "m06-27",
-                            "m06-31", "m06-34", "m06-38", "m06-40", "m06-42", "m06-replay-usage",
+            for cell_id in ("m06-06", "m06-07", "m06-09", "m06-replay-smoke", "m06-27",
+                            "m06-31", "m06-34", "m06-40", "m06-42", "m06-replay-usage",
                             "m06-61", "m06-63", "m06-73"):
                 result = eval(compile(cells[cell_id], cell_id, "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT), namespace)
                 if asyncio.iscoroutine(result):

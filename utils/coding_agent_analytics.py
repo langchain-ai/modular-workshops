@@ -15,6 +15,7 @@ import sys
 import tempfile
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from urllib.parse import urlencode, urlsplit
 from uuid import uuid4
@@ -23,9 +24,6 @@ from langsmith import Client
 from langsmith.utils import LangSmithNotFoundError
 
 from utils.langsmith_rules import api_request
-
-
-FAILURE_DIAGNOSTICS_VERSION = "2026-09-30.2"
 
 
 def field(obj, name, default=None):
@@ -293,7 +291,7 @@ class SkillFilterUnavailable(ValueError):
 
 
 async def verify_skill_filter(client, project, llm_run, filter, *, since):
-    """A visible payload is not proof that the server indexed its tool calls."""
+    """Optional read-only index diagnostic; not required by the workshop flow."""
     from utils.coding_agent_diagnostics import print_diagnostics
 
     if field(llm_run, "run_type", "").lower() != "llm" or not any(
@@ -306,93 +304,21 @@ async def verify_skill_filter(client, project, llm_run, filter, *, since):
         await print_diagnostics(client, project, llm_run=llm_run, since=since,
                                 trigger="skill-filter-query-error", requested_filter=filter, original_error=exc)
         raise ValueError("Skill filter query failed. Automatic diagnostics are printed above. "
-                         "Export this cell's output as HTML. Skill evaluator registration remains blocked.") from None
+                         "Export this diagnostic output as HTML for investigation.") from None
     if not any(str(field(run, "id")) == run_id for run in matches):
         await print_diagnostics(client, project, llm_run=llm_run, since=since,
                                 trigger="skill-filter-no-match", requested_filter=filter)
         raise SkillFilterUnavailable(
             "The observed Skill call did not match the server filter. Automatic diagnostics are printed above. "
-            "Export this cell's output as HTML. Skill evaluator registration remains blocked. "
+            "Export this diagnostic output as HTML for investigation. "
             "The raw trace contains the call; its indexing/query cause is not yet established."
         )
     print("Skill filter matched the inspected LLM run.")
     return _skill_filter_scope(client, project, llm_run, filter, since)
 
 
-async def resolve_skill_filters(client, project, llm_run, indexed_filter, *, since, agent_filter):
-    """Use verified output filtering, or chain deterministic labels into the judge."""
-    try:
-        validation = await verify_skill_filter(client, project, llm_run, indexed_filter, since=since)
-    except SkillFilterUnavailable:
-        label_filter = f'and(eq(run_type, "llm"), {agent_filter})'
-        label_validation = await verify_skill_filter(client, project, llm_run, label_filter, since=since)
-        selection_filter = (f'and({label_filter}, '
-                            'and(eq(feedback_key, "skill_name"), like(feedback_value, "%")))')
-        print("Output-content filtering is unavailable for this run. Using feedback-gated Skill evaluation.\n"
-              "The code labeler checks Claude Code LLM outputs and emits nothing for non-Skill calls.\n"
-              "The hosted judge will select successful skill_name labels; Section 3.5 must verify a fresh label.")
-        return {"mode": "feedback", "label_filter": label_filter, "selection_filter": selection_filter,
-                "label_validation": label_validation, "selection_validation": None,
-                "turn_filter": 'and(eq(run_type, "tool"), eq(name, "Skill"))'}
-    return {"mode": "outputs", "label_filter": indexed_filter, "selection_filter": indexed_filter,
-            "label_validation": validation, "selection_validation": validation, "turn_filter": indexed_filter}
-
-
-async def wait_for_skill_label(client, project, filter, *, since, timeout=90, poll_interval=5):
-    """Find a fresh, truly labeled Skill decision before enabling its hosted judge."""
-    from utils.coding_agent_diagnostics import _capture, _error, _rule_summary
-
-    print("Waiting for a fresh Skill decision with skill_name feedback. "
-          "Run the inspection prompt printed after Section 3.1.", flush=True)
-    try:
-        async with asyncio.timeout(timeout):
-            while True:
-                async with asyncio.timeout(15):
-                    matches = await query_runs(client, project, since=since, filter=filter, limit=10)
-                for run in matches:
-                    names = {call["args"].get("skill") for call in tool_calls(run)
-                             if call["name"] == "Skill" and isinstance(call["args"].get("skill"), str)
-                             and call["args"]["skill"]}
-                    if field(run, "run_type") != "llm" or not names:
-                        raise ValueError("Feedback filter returned a run without an actual named Skill call.")
-                    async with asyncio.timeout(15):
-                        feedback = await asyncio.to_thread(read_feedback, client, [run], ["skill_name"])
-                    labels = set()
-                    for item in feedback:
-                        if (str(field(item, "run_id")) != str(field(run, "id"))
-                                or field(item, "key") != "skill_name"
-                                or (field(item, "extra") or {}).get("error")):
-                            continue
-                        value = field(item, "value")
-                        labels.update([value] if isinstance(value, str) else
-                                      [name for name in value if isinstance(name, str)] if isinstance(value, list) else [])
-                    if names <= labels:
-                        print("Verified fresh Skill labels on LLM:", field(run, "id"), flush=True)
-                        return run
-                await asyncio.sleep(poll_interval)
-    except TimeoutError:
-        print("Skill label verification timed out; collecting recent rule outcomes.", flush=True)
-        summary = await _capture(lambda: _rule_summary(client, str(project.id), filter), "/runs/rules:label-wait")
-        print(json.dumps({"skill_label_wait": {"since": str(since), "filter": filter, "rules": summary}},
-                         ensure_ascii=True), flush=True)
-        raise ValueError("No verified fresh Skill labels before timeout. Complete a fresh Skill inspection after Section 3.1, "
-                         "then rerun Section 3.5. Check the code evaluator logs if labels remain absent. "
-                         "The hosted Skill judge was not registered by this cell.") from None
-    except Exception as exc:
-        print(json.dumps({"skill_label_check": _error(exc, "/skill-label-verification")}), flush=True)
-        raise ValueError("Skill label verification failed; inspect the safe diagnostic above. "
-                         "The hosted Skill judge was not registered by this cell.") from None
-
-
 def _skill_filter_scope(client, project, llm_run, filter, since):
     return (id(client), str(project.id), str(field(llm_run, "id")), filter, str(since))
-
-
-def require_skill_filter_validation(validation, client, project, llm_run, filter, *, since):
-    """Reject missing or stale notebook validation before either Skill rule write."""
-    if validation != _skill_filter_scope(client, project, llm_run, filter, since):
-        raise ValueError("Rerun Section 2.2 successfully with the current connection, project, "
-                         "LLM run, filter, and time window before registering Skill evaluators.")
 
 
 def tool_name(run):
@@ -465,39 +391,6 @@ def show_feedback(client, roots):
     return records
 
 
-def label_counts(feedback):
-    counts = Counter()
-    for item in feedback:
-        if field(item, "key") == "skill_name":
-            value = field(item, "value")
-            counts.update([value] if isinstance(value, str) else (value or []))
-    return counts
-
-
-def show_skill_feedback(runs, feedback):
-    """Show both decision-level feedback types without guessing rule eligibility."""
-    latest = {}
-    for item in sorted(feedback, key=lambda item: str(field(item, "created_at", ""))):
-        latest[(str(field(item, "run_id")), field(item, "key"))] = item
-    rows = []
-    for run in runs:
-        calls = [call for call in tool_calls(run) if call["name"] == "Skill"]
-        if field(run, "run_type") != "llm" or not calls:
-            continue
-        run_id = str(field(run, "id"))
-        labels = field(latest.get((run_id, "skill_name")), "value")
-        score = latest_scores([latest.get((run_id, "skill_selection"))], "skill_selection").get(run_id)
-        missing = [key for key, value in (("skill_name", labels), ("skill_selection", score)) if value is None]
-        rows.append({"decision run": run_id, "selected skills": [call["args"].get("skill") for call in calls],
-                     "skill_name": labels, "skill_selection": score,
-                     "feedback": "complete" if not missing else "missing " + ", ".join(missing)})
-    display_table(rows)
-    if any(row["feedback"] != "complete" for row in rows):
-        print("Missing feedback can be pre-registration, pending, or not evaluated. "
-              "Check rule eligibility and execution logs; use a fresh Skill turn after registration.")
-    return rows
-
-
 def cohort(runs):
     names = sorted(skill_counts(runs))
     return (names[0] if len(names) == 1 else "multiple_skills" if names else "no_skill"), names
@@ -548,7 +441,7 @@ def turn_metrics(traces, scores=None):
 
 
 async def diagnose_missing_costs(client, project, traces, *, since):
-    """Inspect missing measurements even when other sampled turns have costs."""
+    """Optional facilitator report; the notebook shows cost coverage without probes."""
     missing = []
     for root_id, runs in traces.items():
         root = next(run for run in runs if str(field(run, "id")) == root_id)
@@ -578,7 +471,7 @@ async def diagnose_missing_costs(client, project, traces, *, since):
 
 
 async def diagnose_recent_costs(client, project, roots, *, since):
-    """Run before Skill validation so a filter failure cannot hide cost evidence."""
+    """Optional bounded inspection of unpriced recent turns, outside the notebook."""
     if not roots:
         print("No recent turns available for cost inspection.")
         return
@@ -660,7 +553,9 @@ def ensure_dashboard(client, project, web_url):
         raise ValueError("Duplicate workshop dashboards; resolve them in the UI first.")
     section = sections[0] if sections else api_request(client, "POST", "/charts/section", json={
         "title": title, "description": "Skill invocations and turn cost/quality; refreshed by Module 6."})
-    return {"id": section["id"], "url": f"{web_url.rstrip('/')}/o/{project.tenant_id}/dashboards/{section['id']}"}
+    query = urlencode({"timeModel": json.dumps({"duration": "24h"})})
+    return {"id": section["id"],
+            "url": f"{web_url.rstrip('/')}/o/{project.tenant_id}/dashboards/{section['id']}?{query}"}
 
 
 def chart_series(client, project, spec, chart_format="legacy"):
@@ -705,7 +600,18 @@ def preview_charts(client, project, specs, since):
             if not samples:
                 print(f"{spec['title']}: no numeric feedback in the chart yet. "
                       "Check the feedback table, then rerun this preview after processing catches up.")
-        results.append({"chart": spec["title"], "buckets returned": len(buckets), "feedback samples": samples})
+        is_cost = spec["metric"] == "total_cost"
+        cost_values = [item.get("value") for item in buckets
+                       if is_cost and isinstance(item.get("value"), (int, float))
+                       and not isinstance(item["value"], bool) and math.isfinite(item["value"])]
+        cost_total = sum((Decimal(str(value)) for value in cost_values), Decimal(0)) if cost_values else None
+        if is_cost and cost_total is None:
+            print(f"{spec['title']}: chart query returned no numeric costs. "
+                  "Reload the Section 5 traces and rebuild the charts after new priced turns. "
+                  "If the notebook has costs but this preview stays empty, the chart query needs investigation.")
+        results.append({"chart": spec["title"], "buckets returned": len(buckets), "feedback samples": samples,
+                        "cost buckets": len(cost_values) if is_cost else None,
+                        "cost total ($)": cost_total})
     display_table(results)
     return results
 
@@ -736,7 +642,6 @@ def ensure_charts(client, project, dashboard, specs, chart_format="legacy"):
         else:
             chart = api_request(client, "POST", "/charts/create", json=body)
         result.append({"chart": spec["title"], "id": chart["id"]})
-    display_table(result)
     return result
 
 
