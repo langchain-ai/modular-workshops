@@ -1,0 +1,45 @@
+utils/coding_agent_workshop/README.md
+  s_76881090a1a706::t_33890d250002b3 172
+  s_76881090a1a706::t_daffd0e36e6a9d 85-99,174,181
+utils/coding_agent_analytics.py
+  s_76881090a1a706::t_29e53e1d5c9627 28-30,293-297,299-305,307-308,310-312,481-495
+  s_76881090a1a706::t_5dba17f6a35b9a 496-497
+modules/06_coding_agent_analytics.ipynb
+  s_76881090a1a706::t_29e53e1d5c9627 40-41,89,93-96,344,1021,1050-1051
+utils/coding_agent_workshop/tests/test_bms_configuration.py
+  s_76881090a1a706::t_36ae6f3eeb80e2 140-147
+utils/coding_agent_workshop/tests/test_failure_output.py
+  s_76881090a1a706::t_daffd0e36e6a9d 247-297,315
+  s_76881090a1a706::t_965238bd5d0834 298-314
+  s_76881090a1a706::t_210411c451294f 1-246,316-318
+utils/coding_agent_workshop/tests/verify_diagnostic_export.py
+  s_76881090a1a706::t_daffd0e36e6a9d 1-90
+utils/coding_agent_diagnostics.py
+  s_76881090a1a706::t_2e66c697b850a4 11,17,33-35,80-82,87-92,94-95,134-142,151,158-177
+  s_76881090a1a706::t_210411c451294f 71-75,184,187-192,194,197-198,287-292
+  s_76881090a1a706::t_36ae6f3eeb80e2 304-308
+  s_76881090a1a706::t_fcb788d0e44f92 38-43,76-79,100-102,126,128,297,311-312,372-381
+  s_76881090a1a706::t_2fb7f0cd700931 211,235,248,264,272-273,282-286,293-294,296,298-303,309,313-334,337,340-349,352,366-367,369,388,390-392,396,400-401,404,409-411,418,421,425-454
+  s_76881090a1a706::t_286a6c8bf55f73 36-37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.4",
+  "base_commit_sha": "8176f72642534fa28053f7d2d77e3944faba8dd4",
+  "prompts": {},
+  "humans": {
+    "h_7cae82992be157": {
+      "author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  },
+  "sessions": {
+    "s_76881090a1a706": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d0f1-25ea-7f12-891e-209179a303b0",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Avi Kumar <avirath.kmr@gmail.com>"
+    }
+  }
+}
