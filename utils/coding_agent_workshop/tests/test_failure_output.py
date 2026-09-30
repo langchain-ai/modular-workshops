@@ -7,7 +7,7 @@ import io
 import json
 import unittest
 from contextlib import ExitStack, redirect_stdout
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
@@ -64,6 +64,8 @@ class FailureFixture:
         self.probe_error = False
         self.query_error = None
         self.primary_matches = False
+        self.structural_matches = False
+        self.feedback_matches = False
         self.client = SimpleNamespace(
             api_url="https://example.test:8443/api/v1",
             runs=SimpleNamespace(with_raw_response=SimpleNamespace(query=self.modern)),
@@ -98,6 +100,11 @@ class FailureFixture:
     async def primary(self, *args, **kwargs):
         if self.query_error is not None:
             raise self.query_error
+        predicate = kwargs.get("filter", "")
+        if "feedback_key" in predicate:
+            return [self.llm] if self.feedback_matches else []
+        if self.structural_matches and "output_key" not in predicate:
+            return [self.llm]
         return [self.llm] if self.primary_matches else []
 
     def patches(self):
@@ -112,7 +119,8 @@ class FailureFixture:
                     llm_run=self.llm, since=self.since, call_path="messages.content.name",
                     activity_source="live", web_url="https://example.test", workshop_rules={},
                     skill_filter_validation="stale success", agent_filter="root-filter", traces=self.traces,
-                    perform_eval=lambda run: {}, selection_prompt="prompt", selection_schema={}, judge_model={})
+                    perform_eval=lambda run: {}, selection_prompt="prompt", selection_schema={}, judge_model={},
+                    datetime=datetime, timezone=timezone, timedelta=timedelta)
 
 
 async def execute_cell(cell_id, namespace):
@@ -134,7 +142,7 @@ class FailureOutputTests(unittest.IsolatedAsyncioTestCase):
         fixture = FailureFixture()
         namespace, output = await self.run_failure(fixture)
         for expected in ("DIAGNOSTICS BEGIN", "DIAGNOSTICS END", "skill-filter-no-match", PROJECT, LLM,
-                         "2026-09-30.1", "0.16.65", "example.test:8443/api/v1", "requested_filter",
+                         "2026-09-30.2", "0.16.65", "example.test:8443/api/v1", "requested_filter",
                          "id only", "LLM type", "shallow output pair", "output key", "output value",
                          "output pair", "full Skill filter", '"legacy"', '"v2"', '"matched": false',
                          "sdk_matched", "costs: trace", "skill_rules", "pricing", '"status": 403', REQUEST_ID):
@@ -209,6 +217,39 @@ class FailureOutputTests(unittest.IsolatedAsyncioTestCase):
             await analytics.diagnose_missing_costs(fixture.client, fixture.project, fixture.traces, since=fixture.since)
         self.assertFalse(fixture.calls)
         self.assertEqual(output.getvalue(), "")
+
+    async def test_mixed_cost_sample_inspects_unpriced_llm_not_first_priced_turn(self):
+        fixture = FailureFixture()
+        paid = {"id": "paid-root", "trace_total_cost": 0.5}
+        paid_llm = {**fixture.llm, "id": "paid-llm", "total_cost": 0.5}
+        no_usage = {**fixture.llm, "id": "no-usage", "total_tokens": None}
+        traces = {"paid-root": [paid, paid_llm], ROOT: [fixture.root, no_usage, fixture.llm]}
+        with patch.object(diagnostics, "print_diagnostics", new_callable=AsyncMock) as report, \
+                redirect_stdout(io.StringIO()) as output:
+            await analytics.diagnose_missing_costs(fixture.client, fixture.project, traces, since=fixture.since)
+        self.assertEqual(report.call_args.kwargs["llm_run"]["id"], LLM)
+        self.assertIn("1 of 2 sampled turns lack cost", output.getvalue())
+
+    async def test_unpriced_turn_without_llms_reports_absence_without_wrong_sample(self):
+        fixture = FailureFixture()
+        with patch.object(diagnostics, "print_diagnostics", new_callable=AsyncMock) as report, \
+                redirect_stdout(io.StringIO()) as output:
+            await analytics.diagnose_missing_costs(fixture.client, fixture.project,
+                                                  {ROOT: [fixture.root]}, since=fixture.since)
+        report.assert_not_called()
+        self.assertIn("No LLM spans", output.getvalue())
+
+    async def test_early_cost_check_loads_only_bounded_unpriced_trees(self):
+        fixture = FailureFixture()
+        roots = [{"id": "priced", "trace_total_cost": 0},
+                 *[{"id": f"missing-{index}", "trace_total_cost": None} for index in range(3)]]
+        with patch.object(analytics, "read_trace", new_callable=AsyncMock,
+                          side_effect=lambda client, project, root: [root, fixture.llm]) as read, \
+                patch.object(analytics, "diagnose_missing_costs", new_callable=AsyncMock) as diagnose, \
+                redirect_stdout(io.StringIO()):
+            await analytics.diagnose_recent_costs(fixture.client, fixture.project, roots, since=fixture.since)
+        self.assertEqual([call.args[2]["id"] for call in read.call_args_list], ["missing-0", "missing-1"])
+        self.assertEqual(set(diagnose.call_args.args[2]), {"missing-0", "missing-1"})
 
     async def test_partial_output_survives_deadline_and_preserves_original_failure(self):
         fixture = FailureFixture()

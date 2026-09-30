@@ -47,21 +47,46 @@ patches.__enter__()
 globals().update(fixture.namespace())
 """
     notebook = nbformat.v4.new_notebook(cells=[
-        nbformat.v4.new_markdown_cell("# Automatic diagnostic export verification\n\nSynthetic offline responses; not a BMS deployment test."),
+        nbformat.v4.new_markdown_cell("# Diagnostic and feedback fallback verification\n\nSynthetic offline responses; not a BMS deployment test."),
         nbformat.v4.new_code_cell(setup),
         nbformat.v4.new_code_cell(source["m06-17"], id="skill-no-match"),
         nbformat.v4.new_code_cell(source["m06-25"], id="blocked-label-registration"),
         nbformat.v4.new_code_cell(source["m06-38"], id="blocked-selection-registration"),
         nbformat.v4.new_code_cell(source["m06-57"], id="missing-costs"),
         nbformat.v4.new_code_cell('fixture.query_error = actual_rules.LangSmithRequestError("POST", "/api/v2/runs/query", status=403, category="permissions", request_id=REQUEST_ID)\n' + source["m06-17"], id="skill-http-error"),
-        nbformat.v4.new_code_cell('assert not rules.mock_calls\npatches.close()\nprint("Offline export verification completed; no resource writes.")'),
+        nbformat.v4.new_code_cell('''assert not rules.mock_calls
+fixture.query_error = None
+fixture.structural_matches = True
+rules.ensure_code_evaluator.return_value = {"id": "code-rule", "name": "module06-skill-name", "url": "https://example.test/evaluators"}
+rules.ensure_llm_evaluator.return_value = {"id": "judge-rule", "name": "module06-skill-selection", "url": "https://example.test/evaluators"}
+'''),
+        nbformat.v4.new_code_cell(source["m06-17"], id="feedback-fallback"),
+        nbformat.v4.new_code_cell(source["m06-23"], id="standalone-labeler"),
+        nbformat.v4.new_code_cell(source["m06-25"], id="labeler-registration"),
+        nbformat.v4.new_code_cell('''assert skill_filter_validation is None
+assert rules.ensure_llm_evaluator.call_count == 0
+fixture.llm["start_time"] = datetime.now(timezone.utc)
+fixture.llm["outputs"]["messages"][0]["content"][1]["args"]["skill"] = "workshop:fix-bug"
+fixture.feedback_matches = True
+fixture.client.list_feedback = lambda **kwargs: [{"run_id": fixture.llm["id"], "key": "skill_name", "value": name} for name in perform_eval(fixture.llm)["skill_name"]]
+''', id="simulate-fresh-label"),
+        nbformat.v4.new_code_cell(source["m06-38"], id="feedback-judge-registration"),
+        nbformat.v4.new_code_cell('''assert rules.ensure_code_evaluator.call_count == 1
+assert rules.ensure_llm_evaluator.call_count == 1
+assert "output_key" not in rules.ensure_llm_evaluator.call_args.kwargs["filter"]
+assert "feedback_key" in rules.ensure_llm_evaluator.call_args.kwargs["filter"]
+patches.close()
+print("Offline export verification completed; registration calls mocked, no resource writes.")
+'''),
     ], metadata={"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"}})
     NotebookClient(notebook, timeout=180, allow_errors=True,
                    resources={"metadata": {"path": str(REPO)}}).execute()
     errors = [(cell.id, output.ename) for cell in notebook.cells for output in cell.get("outputs", [])
               if output.output_type == "error"]
-    assert errors == [(name, "ValueError") for name in (
-        "skill-no-match", "blocked-label-registration", "blocked-selection-registration", "skill-http-error")], errors
+    assert errors == [("skill-no-match", "SkillFilterUnavailable"),
+                      ("blocked-label-registration", "ValueError"),
+                      ("blocked-selection-registration", "ValueError"),
+                      ("skill-http-error", "ValueError")], errors
     streams = {cell.id: "".join(output.text for output in cell.get("outputs", []) if output.output_type == "stream")
                for cell in notebook.cells}
     for cell_id in ("skill-no-match", "missing-costs", "skill-http-error"):
@@ -70,6 +95,9 @@ globals().update(fixture.namespace())
         assert "PRIVATE-" not in streams[cell_id]
     assert "original_error" in streams["skill-http-error"]
     assert '"status": 403' in streams["skill-http-error"]
+    assert "Skill evaluation mode: feedback" in streams["feedback-fallback"]
+    assert "NEW prompt" in streams["labeler-registration"]
+    assert "Verified fresh Skill labels" in streams["feedback-judge-registration"]
     html, _ = HTMLExporter().from_notebook_node(notebook)
     text = Text()
     text.feed(html)

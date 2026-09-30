@@ -145,7 +145,8 @@ class DiagnosticTests(unittest.IsolatedAsyncioTestCase):
         page = [{"id": PROJECT, "name": "candidate"}] * 100
         with patch.object(rules, "api_request", return_value=page) as api:
             result = diagnostics._pricing(self.client, {"ls_provider": "anthropic"})
-        self.assertEqual(api.call_count, 3)
+        self.assertEqual(api.call_count, 10)
+        self.assertTrue(all("q" not in call.kwargs["params"] for call in api.call_args_list))
         self.assertFalse(result["search_complete"])
         self.assertTrue(result["candidates_truncated"])
         self.assertEqual(len(result["candidates"]), 20)
@@ -158,6 +159,29 @@ class DiagnosticTests(unittest.IsolatedAsyncioTestCase):
             result = diagnostics._pricing(self.client, {"ls_provider": "anthropic", "ls_model_name": "claude-example"}, PROJECT)
         self.assertTrue(result["recorded_price_id_in_results"])
         self.assertEqual([row["id"] for row in result["candidates"]], [PROJECT])
+
+    def test_pricing_finds_recorded_provider_null_map_without_substring_search(self):
+        row = {"id": PROJECT, "name": "Claude Opus", "provider": None,
+               "match_pattern": "claude-opus.*", "prompt_cost": 5, "completion_cost": 25,
+               "private": "PRIVATE-PRICE"}
+        with patch.object(rules, "api_request", return_value=[row]) as api:
+            result = diagnostics._pricing(self.client, {"ls_provider": "anthropic"}, PROJECT)
+        self.assertNotIn("q", api.call_args.kwargs["params"])
+        self.assertTrue(result["recorded_price_id_in_results"])
+        self.assertEqual(result["recorded_price"]["prompt_cost"], {"state": "value", "value": 5.0})
+        self.assertNotIn("PRIVATE-", json.dumps(result))
+
+    def test_legacy_log_sentinel_is_accepted_but_not_counted(self):
+        logs = [{"run_id": LLM, "evaluators": {"outcome": "success", "message": "PRIVATE-LOG"}}] * 10
+        logs.append({"evaluators": {"outcome": "error"}})
+        with patch.object(rules, "api_request", side_effect=[
+            [{"id": PROJECT, "display_name": "module06-skill-name"}], logs,
+        ]):
+            result = diagnostics._rule_summary(self.client, PROJECT, "filter")[0]
+        self.assertTrue(result["more_logs"])
+        self.assertEqual(result["recent_log_outcomes"], {"success": 10})
+        self.assertEqual(len(result["recent_log_scope"]), 10)
+        self.assertNotIn("PRIVATE-", json.dumps(result))
 
 
 if __name__ == "__main__":

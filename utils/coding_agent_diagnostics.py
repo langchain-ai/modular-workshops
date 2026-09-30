@@ -30,7 +30,7 @@ COST_FIELDS = ("total_cost", "prompt_cost", "completion_cost", "total_tokens", "
 RUN_SELECTS = ["ID", "TRACE_ID", "RUN_TYPE", "START_TIME", "END_TIME", "OUTPUTS", "EXTRA", "METADATA",
                "PRICE_MODEL_ID", *[name.upper() for name in COST_FIELDS]]
 MODEL_FIELDS = ("ls_model_name", "ls_provider", "ls_integration_version", "ls_agent_runtime_version")
-DIAGNOSTICS_VERSION = "2026-09-30.1"
+DIAGNOSTICS_VERSION = "2026-09-30.2"
 REPORT_TIMEOUT_SECONDS = 120
 PROBE_TIMEOUT_SECONDS = 20
 
@@ -172,6 +172,7 @@ def _payload_summary(run):
     return {"id": _text(analytics.field(run, "id")),
             "trace_id": _text(analytics.field(run, "trace_id")),
             "start_time": _text(analytics.field(run, "start_time")),
+            "end_time": _text(analytics.field(run, "end_time")),
             "run_type": _text(analytics.field(run, "run_type")),
             "skill_call_count": sum(call["name"] == "Skill" for call in calls),
             "observed_call_path": analytics.observed_call_path(run) if calls else None}
@@ -200,34 +201,39 @@ async def _trace_costs(client, project_id, trace_id, since, until):
 
 
 def _pricing(client, model, price_model_id=None):
-    """Candidate search only: q is substring search, not the server's price matcher."""
+    """List bounded pricing candidates; provider substring search can omit valid maps."""
     rows = []
     complete = False
     provider = model.get("ls_provider")
-    for offset in range(0, 300, 100):
+    for offset in range(0, 1000, 100):
         params = {"limit": 100, "offset": offset}
-        if provider:
-            params["q"] = provider
         page = rules.api_request(client, "GET", "/model-price-map/", params=params, timeout=10)
-        if not isinstance(page, list) or len(page) > 100:
-            raise ValueError("Unexpected pricing page shape.")
+        if not isinstance(page, list) or len(page) > 100 or any(not isinstance(row, dict) for row in page):
+            raise DiagnosticResponseError("pricing: list of at most 100 objects")
         rows.extend(page)
         if len(page) < 100:
             complete = True
             break
-    compatible = [row for row in rows if not row.get("provider") or not provider
+    compatible = [row for row in rows if str(row.get("id")) == price_model_id
+                  or not row.get("provider") or not provider
                   or str(row["provider"]).lower() == provider.lower()]
     model_name = (model.get("ls_model_name") or "").lower()
     compatible.sort(key=lambda row: (str(row.get("id")) != price_model_id,
                                     model_name not in str(row.get("name", "")).lower()))
-    return {"search": provider, "search_complete": complete, "returned": len(rows),
+    recorded = next((row for row in rows if str(row.get("id")) == price_model_id), None)
+    return {"search": "unfiltered listing", "search_complete": complete, "returned": len(rows),
             "compatible_provider_candidates": len(compatible),
             "recorded_price_id_in_results": any(str(row.get("id")) == price_model_id for row in rows)
             if price_model_id else None,
+            "recorded_price": ({**{key: _text(recorded.get(key)) for key in
+                                   ("id", "name", "provider", "match_pattern", "start_time")},
+                                "prompt_cost": _measurement(recorded, "prompt_cost"),
+                                "completion_cost": _measurement(recorded, "completion_cost")}
+                               if recorded else None),
             "candidates": [{key: _text(row.get(key)) for key in
                             ("id", "name", "provider", "match_pattern", "start_time")} for row in compatible[:20]],
             "candidates_truncated": len(compatible) > 20,
-            "note": "Candidate substring search only; absent results do not prove no matching price. "
+            "note": "Bounded candidate listing, not the server's price matcher; absent results do not prove no matching price. "
                     "Check the actual model, provider, activation date, rates and cache-token prices in the UI."}
 
 
@@ -246,11 +252,16 @@ def _rule_summary(client, project_id, predicate):
         path = f"/runs/rules/{_uuid(rule['id'])}/logs"
         try:
             logs = rules.api_request(client, "GET", path, params={"limit": 10}, timeout=10)
-            if not isinstance(logs, list) or len(logs) > 10:
-                raise ValueError("Unexpected evaluator log page.")
+            # The legacy endpoint returns limit + 1 rows as a pagination sentinel.
+            if not isinstance(logs, list) or len(logs) > 11 or any(not isinstance(log, dict) for log in logs):
+                raise DiagnosticResponseError("rule logs: list of at most 11 objects for limit=10")
+            entry["more_logs"] = len(logs) > 10
+            logs = logs[:10]
             outcomes = [(log.get("evaluators") or {}).get("outcome") for log in logs]
             entry["recent_log_outcomes"] = dict(Counter(
                 outcome if outcome in {"success", "error", "skipped"} else "other" for outcome in outcomes))
+            entry["recent_log_scope"] = [{key: _text(log.get(key)) for key in
+                                          ("run_id", "start_time", "end_time")} for log in logs]
         except ERRORS as exc:
             entry["recent_logs"] = _error(exc, path)
         result.append(entry)

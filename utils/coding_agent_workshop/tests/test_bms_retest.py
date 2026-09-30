@@ -15,6 +15,7 @@ import requests
 from utils import coding_agent_analytics as analytics
 from utils import langsmith_rules as rules
 from utils.coding_agent_workshop.tests.test_module06 import FakeClient, ROOT, llm_output, skill_call
+from utils.coding_agent_workshop.tests.test_failure_output import execute_cell
 
 
 def notebook_cells():
@@ -54,7 +55,8 @@ class SkillRegistrationTests(unittest.IsolatedAsyncioTestCase):
                          llm_run=self.llm, since=self.since, call_path="messages.content.name",
                          activity_source="live", web_url="https://example.test", workshop_rules={},
                          perform_eval=lambda run: {}, selection_prompt="prompt", selection_schema={},
-                         judge_model={}, agent_filter="root-filter")
+                         judge_model={}, agent_filter="root-filter", datetime=datetime,
+                         timezone=timezone, timedelta=timedelta)
         namespace["skill_filter_validation"] = await self.verify()
         code = compile(cells["m06-17"], "m06-17", "exec", flags=ast.PyCF_ALLOW_TOP_LEVEL_AWAIT)
         with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[]):
@@ -63,7 +65,7 @@ class SkillRegistrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(namespace["skill_filter_validation"])
         for cell_id in ("m06-25", "m06-38"):
             with self.subTest(cell=cell_id), self.assertRaisesRegex(ValueError, "Section 2.2"):
-                exec(compile(cells[cell_id], cell_id, "exec"), namespace)
+                await execute_cell(cell_id, namespace)
         self.assertFalse(api.mock_calls)
 
         with patch.object(analytics, "query_runs", new_callable=AsyncMock, return_value=[self.llm]), \
@@ -73,7 +75,7 @@ class SkillRegistrationTests(unittest.IsolatedAsyncioTestCase):
             api.ensure_code_evaluator.return_value = {"name": "skill", "id": "code", "url": "url"}
             api.ensure_llm_evaluator.return_value = {"name": "selection", "id": "judge", "url": "url"}
             for cell_id in ("m06-25", "m06-38"):
-                exec(compile(cells[cell_id], cell_id, "exec"), namespace)
+                await execute_cell(cell_id, namespace)
         api.ensure_code_evaluator.assert_called_once()
         api.ensure_llm_evaluator.assert_called_once()
 

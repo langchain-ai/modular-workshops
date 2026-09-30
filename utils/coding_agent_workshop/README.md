@@ -85,10 +85,12 @@ Prepared mode reads an existing project. It skips project creation, rule registr
 ### Retest and export
 
 1. Pull the complete updated repository, including `utils/`, and restart the notebook kernel.
-2. Rerun setup and confirm it prints **`Failure diagnostics: automatic (2026-09-30.1)`**. A stale helper version stops setup with a restart instruction.
+2. Rerun setup and confirm it prints **`Failure diagnostics: automatic (2026-09-30.2)`**. A stale helper version stops setup with a restart instruction. The early cost check inspects up to two unpriced recent turns before Skill validation, even when other turns already have costs.
 3. Run Section 2.2 normally. A failed query or missing Skill match automatically prints **`MODULE 06 DIAGNOSTICS BEGIN`**, then the exact scope, original error (if any), per-predicate legacy/V2 results, costs, model details, Skill rule state, and pricing candidates. Wait for **`MODULE 06 DIAGNOSTICS END`** before exporting. Diagnostic work is bounded to two minutes; each completed probe is printed immediately, and a timeout preserves the partial report.
-4. Continue the independent sections after any error. Both Skill registrations remain blocked until validation passes. Section 5.2 also prints a diagnostic report automatically if every sampled turn lacks cost, even if Skill validation succeeded. A real zero cost does not trigger it.
-5. Export the notebook **as HTML with all outputs**, including the setup version, diagnostic reports, and errors. No extra cells or terminal commands are required to capture these reports. Do not clear this retest export's outputs.
+4. If only output-content matching fails, Section 2.2 verifies a structural Claude Code LLM selector and prints **`Skill evaluation mode: feedback`**. The deterministic code evaluator reads raw outputs; the hosted judge uses successful `skill_name` feedback. Request failures or failed structural validation still block registration. The underlying deployment indexing issue remains open.
+5. In feedback mode, run Section 3.1, then execute the **new inspection prompt printed by that cell** in the same Claude Code session. Continue to Section 3.5 after it finishes. That cell waits up to 90 seconds for the fresh decision's labels, checks the actual labels and raw Skill call, and verifies the exact run against the feedback filter before updating the hosted judge. If pending, inspect the code evaluator logs and rerun Section 3.5. Existing rule updates do not backfill the earlier inspection. Use live activity for this fallback; recorded replay still requires working output indexing.
+6. After all five rules register, run the Section 4 tasks and check both `skill_name` and `skill_selection` on the new decisions in Section 5.1. The bootstrap inspection establishes eligibility; these later turns establish hosted judge execution. Section 5.2 now diagnoses **any** unpriced turns, selecting an LLM from an unpriced turn and preferring missing cost with token usage. A recorded zero stays valid.
+7. Export the notebook **as HTML with all outputs**, including the setup version, diagnostic reports, registration results, and feedback. No manual diagnostic cell is required. Do not clear this retest export's outputs.
 
 Reports omit trace content, tool arguments, credentials, provider configurations, and raw error bodies. They record safe HTTP status, category, request ID, and error location when available. An individual failed probe remains visible while other probes continue. `finished` means collection finished; inspect individual probe errors too. `incomplete` means the time limit or an unexpected diagnostic failure stopped collection; share the partial report.
 
@@ -109,7 +111,7 @@ diagnostic_report = await collect_diagnostics(
 print(json.dumps(diagnostic_report, indent=2))
 ```
 
-The report compares the exact run through legacy and V2 queries, decomposes the Skill predicate, and compares cost fields before and after SDK/helper normalization. It includes model/provider/plugin versions, the two Skill rules' enabled/filter state, and recent execution-outcome counts. It excludes prompts, responses, tool arguments, provider configurations, and credentials. Pricing results are **candidates from substring search**, not proof that a price matches; the facilitator checks the actual model/provider/date and rates in the UI.
+The report compares the exact run through legacy and V2 queries, decomposes the Skill predicate, and compares cost fields before and after SDK/helper normalization. It includes model/provider/plugin versions, the two Skill rules' enabled/filter state, and recent execution-outcome counts. The legacy log reader accepts the extra pagination row and summarizes the requested ten. It excludes prompts, responses, tool arguments, provider configurations, and credentials. Pricing uses a bounded **unfiltered listing** so provider-null maps are visible, reports incomplete coverage, and identifies the recorded price UUID when found. Candidate rows alone do not establish a pricing match; the facilitator checks model/provider/date, rates, and cache-token pricing in the UI.
 
 For a fresh terminal, run from the repository root with the actual IDs and a timestamp containing the original run:
 
@@ -134,6 +136,8 @@ Interpret the report in order:
 6. **Dashboard without dates fails but bounded read succeeds:** this matches the 0.16.65 populated-section time-window behavior. The updated save helper supplies dates. A genuine missing dashboard remains an error; recreating it can introduce duplicates.
 
 After correction, exercise both workshop skills and verify all five feedback types. Save the dashboard twice and reconnect in a fresh kernel to verify the same IDs are reused. Wait for final feedback, then run the exact-ID pause cell.
+
+The feedback workaround is supported by the pinned 0.16.65 source: [feedback-triggered rule eligibility](https://github.com/langchain-ai/langchainplus/blob/cda0e08d9c0af248dee8ee96bbca3186cee70962/smith-backend/app/models/run_rules/data_source.py#L197), [paired feedback-value filtering](https://github.com/langchain-ai/langchainplus/blob/cda0e08d9c0af248dee8ee96bbca3186cee70962/smith-backend/app/tests/api/test_group.py#L4438), and [empty-list label handling](https://github.com/langchain-ai/langchainplus/blob/cda0e08d9c0af248dee8ee96bbca3186cee70962/smith-backend/app/models/runs/utils.py#L265). Preserve the same rule IDs to retain application deduplication. Code labeling covers Claude Code LLM spans in this participant project; the hosted judge remains limited to successful Skill labels. BMS execution must still be confirmed by the fresh-turn checks above.
 
 ### Capacity for 40–60 attendees
 
@@ -171,7 +175,7 @@ The live path requires Claude activity between sections. Replay mode permits a n
 
 - [ ] Before the final push, revisit [Claude plugin evals](https://code.claude.com/docs/en/plugin-evals): an optional capstone, importing results into LangSmith, and evaluating the evaluator. Decide whether to include this in the workshop or a follow-on lab.
 - [ ] Run every cell and audit its output. Remove diagnostic/debug output and redundant status messages or detail dumps from the normal notebook flow; keep each cell's essential instructional results clean and minimal.
-- [ ] Keep successful cell outputs minimal. Failures and wholly missing costs must automatically print diagnostic evidence in their cells; extra manual diagnostics are optional.
+- [ ] Keep successful cell outputs minimal. Failures and partially or wholly missing costs must automatically print diagnostic evidence in their cells; extra manual diagnostics are optional.
 - [ ] Clear saved cell outputs and execution counts before distributing the final notebook.
 
 ## Troubleshooting
