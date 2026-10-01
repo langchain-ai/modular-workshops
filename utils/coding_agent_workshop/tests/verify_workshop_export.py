@@ -42,9 +42,10 @@ def main():
 
     setup = '''import copy
 from unittest.mock import patch
-from utils.coding_agent_workshop.tests.test_failure_output import FailureFixture
+from utils.coding_agent_workshop.tests.test_failure_output import FailureFixture, REPO
 from utils.coding_agent_workshop.tests.test_workshop_flow import workshop_namespace, RULE_NAMES
 fixture = FailureFixture()
+project_root = REPO
 async def executions(*args, **kwargs):
     assert kwargs["filter"] == 'and(eq(run_type, "tool"), eq(name, "Skill"))'
     return [{"id": "skill-tool", "name": "Skill", "run_type": "tool",
@@ -59,7 +60,7 @@ trace_runs[0]["outputs"]["messages"][0]["content"][1]["args"] = {"skill": "works
     cells = [nbformat.v4.new_markdown_cell(
         "# Module 6 retained-flow verification\n\nSynthetic offline responses; not a BMS deployment test."),
         nbformat.v4.new_code_cell(setup)]
-    for cell_id in ("m06-15", "m06-skill-executions", "m06-17", "m06-23", "m06-24", "m06-57"):
+    for cell_id in ("m06-assets", "m06-15", "m06-skill-executions", "m06-17", "m06-23", "m06-24", "m06-57"):
         cells.append(nbformat.v4.new_code_cell(source[cell_id], id=cell_id))
     cells.append(nbformat.v4.new_code_cell('''assert len(skill_runs) == 1
 assert skill_turns == [fixture.root]
@@ -109,7 +110,8 @@ print("Offline export verification completed; all network I/O mocked, no resourc
     text = Text()
     text.feed(html)
     rendered = "".join(text.parts)
-    for expected in ("Parent turns:", "workshop:fix-bug", "Quality evaluator:", "Completion evaluator:",
+    for expected in ("Starting app", "Fix-bug instructions", "Review-change instructions",
+                     "Parent turns:", "workshop:fix-bug", "Quality evaluator:", "Completion evaluator:",
                      "Session evaluator:", "costed turns", "Saved 3 charts. Open the dashboard:"):
         assert expected in rendered, expected
     assert "PRIVATE-" not in rendered

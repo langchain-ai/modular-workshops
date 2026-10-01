@@ -36,7 +36,7 @@ def load_evaluator():
     source = "".join(next(cell["source"] for cell in notebook["cells"] if cell["id"] == "m06-23"))
     filename = "<module06-evaluator-cell>"
     linecache.cache[filename] = (len(source), None, source.splitlines(True), filename)
-    namespace = {}
+    namespace = {"analytics": analytics}
     exec(compile(source, filename, "exec"), namespace)
     return namespace["perform_eval"]
 
@@ -47,6 +47,34 @@ def llm_output(calls):
 
 def skill_call(name, call_id="a"):
     return {"type": "tool_call", "name": "Skill", "args": {"skill": name}, "id": call_id}
+
+
+class AssetPreviewTests(unittest.TestCase):
+    def test_preview_shows_starting_app_and_both_skills_without_running_them(self):
+        with patch("IPython.display.display") as display:
+            analytics.show_workshop_assets(ROOT)
+        rendered = display.call_args.args[0].data
+        self.assertIn("sample_repo/tracker.py", rendered)
+        self.assertIn("sample_repo/test_tracker.py", rendered)
+        self.assertIn("plugin/skills/fix-bug/SKILL.md", rendered)
+        self.assertIn("plugin/skills/review-change/SKILL.md", rendered)
+        self.assertIn("&lt;= today", rendered)
+        self.assertNotIn("solutions/", rendered)
+
+    def test_preview_rejects_symlink_outside_assets_and_oversized_content(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            app = root / "utils/coding_agent_workshop/sample_repo/tracker.py"
+            app.parent.mkdir(parents=True)
+            outside = root / "outside.py"
+            outside.write_text("not a workshop asset")
+            app.symlink_to(outside)
+            with self.assertRaisesRegex(ValueError, "inside the workshop"):
+                analytics.show_workshop_assets(root)
+            app.unlink()
+            app.write_text("x" * 64_001)
+            with self.assertRaisesRegex(ValueError, "64 KB"):
+                analytics.show_workshop_assets(root)
 
 
 class ConfigurationTests(unittest.TestCase):
@@ -313,6 +341,28 @@ class MetricsTests(unittest.TestCase):
         feedback = [{"run_id": "r", "key": "output_quality", "score": score, "created_at": time}
                     for score, time in [(0.2, "2026-01-01"), (0.8, "2026-01-02")]]
         self.assertEqual(analytics.latest_scores(feedback, "output_quality"), {"r": 0.8})
+
+    def test_new_unscored_result_does_not_reuse_an_older_score(self):
+        feedback = [
+            {"run_id": "r", "key": "output_quality", "score": 1, "created_at": "2026-01-01"},
+            {"run_id": "r", "key": "output_quality", "score": None, "created_at": "2026-01-02"},
+            {"run_id": "zero", "key": "output_quality", "score": 0, "created_at": "2026-01-02"},
+        ]
+        self.assertEqual(analytics.latest_scores(feedback, "output_quality"), {"zero": 0.0})
+
+    def test_feedback_distinguishes_new_scores_earlier_labels_and_missing_results(self):
+        records = [
+            {"run_id": "a", "key": "task_completion", "value": "complete", "created_at": "1"},
+            {"run_id": "a", "key": "task_completion", "score": 1, "created_at": "2"},
+            {"run_id": "b", "key": "task_completion", "value": "insufficient_evidence"},
+            {"run_id": "c", "key": "task_completion", "score": None},
+        ]
+        with patch.object(analytics, "read_feedback", return_value=records), \
+                patch.object(analytics, "display_table") as table:
+            analytics.show_feedback(None, [{"id": name} for name in "abcd"])
+        values = [row["task_completion"] for row in table.call_args.args[0]]
+        self.assertEqual(values, [1, "insufficient_evidence (earlier label)",
+                                  "unscored — inspect evaluator", "pending / unscored"])
 
     def test_cohort_filters_partition_roots_without_trace_writes(self):
         skill = {"run_type": "tool", "name": "Skill", "extra": {"metadata": {"ls_skill_name": "fix"}}}

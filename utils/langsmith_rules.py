@@ -387,10 +387,14 @@ def judge_model_config(client: Optional[Client] = None, *, model_name: Optional[
     return {"model": model}
 
 
-def feedback_schema(key: str, description: str, *, categories=None) -> dict:
+def feedback_schema(key: str, description: str, *, categories=None, scores=None) -> dict:
     """One named metric and one explanation, matching Module 4's schema pattern."""
+    if categories is not None and scores is not None:
+        raise ValueError("Choose categorical labels or numeric scores, not both.")
     metric = ({"type": "string", "enum": list(categories)} if categories else
               {"type": "number", "minimum": 0, "maximum": 1})
+    if scores is not None:
+        metric["enum"] = list(scores)
     return {"title": key, "description": description, "type": "object",
             "properties": {key: {**metric, "description": description},
                            "comment": {"type": "string", "description": "One sentence of evidence."}},

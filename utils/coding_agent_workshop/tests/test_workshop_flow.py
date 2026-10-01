@@ -74,6 +74,9 @@ class WorkshopFlowTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(rule["session_id"], "project")
                 structured = rule["evaluators"][0]["structured"]
                 self.assertEqual(structured["schema"]["title"], rule["display_name"].removeprefix("module06-").replace("-", "_"))
+                metric = structured["schema"]["properties"][structured["schema"]["title"]]
+                self.assertEqual(metric["type"], "number")
+                self.assertEqual(metric["enum"], [0, 0.5, 1])
                 self.assertEqual(rule.get("group_by") == "thread_id", rule["display_name"] == "module06-session-outcome")
                 self.assertNotIn("code_evaluators", rule)
             await execute_cell("m06-73", namespace)

@@ -109,6 +109,36 @@ def prepare_workspace(project_root: Path) -> Path:
     return workspace
 
 
+def show_workshop_assets(project_root: Path):
+    """Display the supplied starting app and skills, never a participant's edits."""
+    from IPython.display import HTML, display
+
+    asset_root = (project_root / "utils/coding_agent_workshop").resolve()
+    assets = [
+        ("Starting app", "sample_repo/tracker.py"),
+        ("Sample tasks", "sample_repo/tasks.json"),
+        ("Starting tests", "sample_repo/test_tracker.py"),
+        ("Fix-bug instructions", "plugin/skills/fix-bug/SKILL.md"),
+        ("Review-change instructions", "plugin/skills/review-change/SKILL.md"),
+    ]
+    sections = []
+    for title, relative_path in assets:
+        path = (asset_root / relative_path).resolve()
+        if not path.is_relative_to(asset_root):
+            raise ValueError("Workshop preview files must stay inside the workshop assets.")
+        if path.stat().st_size > 64_000:
+            raise ValueError("Workshop preview file exceeds 64 KB.")
+        with path.open("rb") as source:
+            content = source.read(64_001)
+        if len(content) > 64_000:
+            raise ValueError("Workshop preview file exceeds 64 KB.")
+        sections.append(
+            f"<details><summary>{html.escape(title)} — {html.escape(relative_path)}</summary>"
+            f"<pre style='white-space:pre-wrap'>{html.escape(content.decode('utf-8'))}</pre></details>"
+        )
+    display(HTML("".join(sections)))
+
+
 def check_local_setup(project_root: Path):
     """Exercise the local MCP lifecycle before launching a coding agent."""
     server = project_root / "utils/coding_agent_workshop/plugin/server.py"
@@ -139,7 +169,6 @@ def launch_instructions(project_root: Path, workspace: Path, plugin_root: Path,
                "--env-file", str(project_root / ".env"), "--workspace", str(workspace),
                "--plugin-root", str(plugin_root), "--api-url", api_url,
                "--project-name", project_name, "--workspace-id", workspace_id or ""]
-    print("# Run in a terminal; this loads the same root .env as the notebook:")
     print(shlex.join(command))
 
 
@@ -171,6 +200,15 @@ def show_runs(runs, project, web_url):
     display_table([{"run": str(field(run, "id"))[:8], "name": field(run, "name"),
                     "type": field(run, "run_type"), "cost ($)": turn_cost(run),
                     "thread": thread_id(run), "link": run_url(run, project, web_url)} for run in runs])
+
+
+def show_skill_runs(runs, project, web_url):
+    print("Skill tool executions:")
+    display_table([
+        {"run": field(run, "id"), "skill": skill_name(run), "type": field(run, "run_type"),
+         "link": run_url(run, project, web_url)} for run in runs
+    ])
+    print(f"{len(runs)} Skill executions in this project and time window.")
 
 
 def require_first(items, message="No traces yet. Complete the smoke task and rerun the query."):
@@ -372,9 +410,14 @@ def read_feedback(client, runs, keys):
 def latest_scores(feedback, key):
     by_run = {}
     for item in sorted(feedback, key=lambda item: str(field(item, "created_at", ""))):
+        if field(item, "key") != key:
+            continue
+        run_id = str(field(item, "run_id"))
         score = field(item, "score")
-        if field(item, "key") == key and isinstance(score, (float, int)) and math.isfinite(score):
-            by_run[str(field(item, "run_id"))] = float(score)
+        if isinstance(score, (float, int)) and math.isfinite(score):
+            by_run[run_id] = float(score)
+        else:
+            by_run.pop(run_id, None)
     return by_run
 
 
@@ -384,7 +427,9 @@ def show_feedback(client, roots):
     by_run = defaultdict(dict)
     for item in sorted(records, key=lambda item: str(field(item, "created_at", ""))):
         value = field(item, "value")
-        by_run[str(field(item, "run_id"))][field(item, "key")] = value if value is not None else field(item, "score")
+        score = field(item, "score")
+        result = score if score is not None else f"{value} (earlier label)" if value is not None else "unscored — inspect evaluator"
+        by_run[str(field(item, "run_id"))][field(item, "key")] = result
     display_table([{"turn": str(field(root, "id"))[:8],
                     **{key: by_run[str(field(root, "id"))].get(key, "pending / unscored") for key in keys}}
                    for root in roots])
@@ -438,6 +483,19 @@ def turn_metrics(traces, scores=None):
              "costed turns": len(row["known_costs"]),
              "mean quality": sum(row["scores"]) / len(row["scores"]) if row["scores"] else None,
              "scored turns": len(row["scores"])} for name, row in sorted(groups.items())]
+
+
+def show_turn_metrics(metrics, *, metric):
+    """Show a comparison with its coverage so missing measurements stay visible."""
+    options = {
+        "cost": ("total cost ($)", "Total turn cost by skill group", "costed turns", " USD", 4),
+        "quality": ("mean quality", "Mean turn quality by skill group", "scored turns", "", 2),
+    }
+    if metric not in options:
+        raise ValueError("Choose cost or quality.")
+    value, title, coverage, unit, decimals = options[metric]
+    ranked_bars({row["skill group"]: row[value] for row in metrics}, title, unit=unit, decimals=decimals)
+    display_table([{key: row[key] for key in ("skill group", "turns", coverage)} for row in metrics])
 
 
 async def diagnose_missing_costs(client, project, traces, *, since):
