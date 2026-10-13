@@ -6,7 +6,7 @@ This is a condensed version of LangChain Academy, intended to be run in a sessio
 
 ## Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) (recommended) or pip
 
 ## Setup
@@ -23,12 +23,15 @@ cp .env.example .env
 | Key | Required for | Get one |
 |-----|--------------|---------|
 | `OPENAI_API_KEY` | Modules 1-4 (default model) | <https://platform.openai.com> |
-| `LANGSMITH_API_KEY` | Modules 3 & 4 (recommended for all) | <https://smith.langchain.com> |
+| `LANGSMITH_API_KEY` | Modules 3, 4 & 6 (recommended for all) | <https://smith.langchain.com> |
 | `LANGSMITH_API_KEY_GATEWAY` / `WORKSPACE_ID` | Module 3 §1 (LangSmith Gateway policies) | same key as `LANGSMITH_API_KEY`; workspace ID from LangSmith Settings → Workspace |
 | `TAVILY_API_KEY` | Modules 1 & 3 (web search tool) | <https://tavily.com> |
 
 ```bash
-# 3. Start Jupyter
+# 3. Register the virtual environment's notebook kernel
+uv run python -m ipykernel install --user --name=venv --display-name "Python (modular-workshop)"
+
+# 4. Start Jupyter and select Python (modular-workshop)
 uv run jupyter notebook
 ```
 
@@ -36,7 +39,7 @@ Open whichever module(s) your recipe calls for.
 
 ## Switching Models
 
-All modules import `model` from `utils/models.py`. Change one line there to swap providers — no notebook edits required.
+Modules 1–5 import `model` from `utils/models.py`. Change one line there to swap providers — no notebook edits required. Modules 4 and 6 share hosted online judge defaults in `utils/langsmith_rules.py`; Module 6 reuses the existing project, connection, workspace, and provider settings.
 
 ```python
 # utils/models.py
@@ -72,6 +75,12 @@ Module 5 introduces **LangSmith Engine** — it reads your deployed agent's prod
 
 Engine's first analysis takes ~20 minutes, so it's best primed before a session. Needs the Module 3 deployment and a `LANGSMITH_API_KEY`.
 
+## Coding Agent Analytics (Module 6)
+
+[Module 6](modules/06_coding_agent_analytics.ipynb) traces Claude Code usage, inspects and counts skill invocations, evaluates turns and sessions, and compares skill/MCP usage, turn cost, and quality. It is standalone and automates evaluator and dashboard setup from the notebook.
+
+The [pre-work guide](utils/coding_agent_workshop/README.md) covers the tracing plugin, supplied task plugin and local MCP, Azure/OpenAI hosted judges, and self-hosted API/UI settings. Each participant gets a separate project and dashboard. Recorded trace replay and a prepared-project mode provide checkpoints if setup falls behind. The sample Python task tracker has a seeded bug and tests; participants work in fresh copies. No additional Python dependencies are needed. The workshop takes about 85 minutes including a break.
+
 ## Project Structure
 
 ```
@@ -81,6 +90,7 @@ modular-workshops/
 ├── .env.example
 ├── langgraph.json                  (registers agents/deep_agent for langgraph dev)
 ├── utils/
+│   └── coding_agent_workshop/      (Module 6 sample app, task plugin, local MCP, and tests)
 ├── agents/
 │   ├── research_agent.py           (shared agent factory — Module 1 references, Module 4 imports for eval)
 │   └── deep_agent/                 (deployable + governed agent for Module 3)
@@ -94,7 +104,9 @@ modular-workshops/
     ├── 01_deep_agents.ipynb        (Module 1)
     ├── 02_langgraph.ipynb          (Module 2)
     ├── 03_deploy_and_govern.ipynb  (Module 3)
-    └── 04_langsmith.ipynb          (Module 4)
+    ├── 04_langsmith.ipynb          (Module 4)
+    ├── 05_engine.ipynb             (Module 5)
+    └── 06_coding_agent_analytics.ipynb (Module 6)
 ```
 
 ## Common Issues

@@ -1,0 +1,6 @@
+[
+  {"id": "recent", "title": "Review pull request", "due": "2026-01-14", "completed": false},
+  {"id": "oldest", "title": "Update documentation", "due": "2026-01-10", "completed": false},
+  {"id": "today", "title": "Plan sprint", "due": "2026-01-15", "completed": false},
+  {"id": "finished", "title": "Close resolved issue", "due": "2026-01-09", "completed": true}
+]

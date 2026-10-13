@@ -51,6 +51,10 @@ Thumbs.db
 # Local langgraph dev output
 .langgraph_api/
 
+# Local workshop planning and validation notes
+/docs/
+.module06/
+
 # Deep Agents SQLite long-term memory (notebook demo artifact)
 deep_agents_memory.db
 deep_agents_memory.db-*
