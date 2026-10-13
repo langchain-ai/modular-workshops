@@ -2430,7 +2430,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.1.1" },
     { name = "requests", specifier = ">=2.32.5" },
     { name = "sqlalchemy", specifier = ">=2.0" },
-    { name = "tavily-python", specifier = ">=0.7.21" },
+    { name = "tavily-python", specifier = ">=0.7.25" },
 ]
 
 [package.metadata.requires-dev]

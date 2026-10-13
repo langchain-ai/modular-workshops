@@ -24,7 +24,7 @@ dependencies = [
     "python-dotenv>=1.1.1",
     "requests>=2.32.5",
     "sqlalchemy>=2.0",
-    "tavily-python>=0.7.21",
+    "tavily-python>=0.7.25",
     "langchain-core>=1.5.3",
 ]
 
