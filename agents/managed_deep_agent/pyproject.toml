@@ -1,0 +1,12 @@
+[project]
+name = "managed_deep_agent"
+version = "0.0.0"
+description = "A Managed Deep Agent project."
+requires-python = ">=3.11"
+dependencies = [
+    "managed-deepagents==0.5.3",
+    "langchain>=1.3.10",
+    "langchain-core>=1.4",
+    "langchain-openai>=1.0.1",
+    "tavily-python>=0.7.21",
+]

@@ -72,6 +72,14 @@ Module 5 introduces **LangSmith Engine** — it reads your deployed agent's prod
 
 Engine's first analysis takes ~20 minutes, so it's best primed before a session. Needs the Module 3 deployment and a `LANGSMITH_API_KEY`.
 
+## Managed Deep Agents (Module 6)
+
+Module 6 ports the Module 3 deep agent from the self-hosted path (`create_deep_agent` + `langgraph deploy`) to a **Managed Deep Agent** — authored as a directory and shipped with the `mda` CLI, so the managed runtime provides the backend, store, checkpointer, memory, skills, and system prompt.
+
+The ported project is `agents/managed_deep_agent/`: same tavily search, research subagent, skills, and memory, on the same gateway-routed OpenAI model as Module 3 (configured inline in its `agent.py`, since an `mda` project is a self-contained directory and can't import the workshop's `utils/`). HITL is dropped to keep the port focused.
+
+Install the CLI once (`uv tool install --prerelease allow managed-deepagents`), then `mda dev agents/managed_deep_agent` to run it in Studio, or `mda deploy agents/managed_deep_agent` to host it. Reuses the existing `LANGSMITH_API_KEY`, `LANGSMITH_API_KEY_GATEWAY`, and `TAVILY_API_KEY`; the project has its own `pyproject.toml` (run `uv sync` inside it). MDA is in public beta on US LangSmith Cloud only.
+
 ## Project Structure
 
 ```
@@ -83,18 +91,29 @@ modular-workshops/
 ├── utils/
 ├── agents/
 │   ├── research_agent.py           (shared agent factory — Module 1 references, Module 4 imports for eval)
-│   └── deep_agent/                 (deployable + governed agent for Module 3)
-│       ├── agent.py
-│       ├── AGENTS.md
-│       └── skills/
-│           ├── linkedin-post/SKILL.md
-│           └── twitter-post/SKILL.md
+│   ├── deep_agent/                 (deployable + governed agent for Module 3)
+│   │   ├── agent.py
+│   │   ├── AGENTS.md
+│   │   └── skills/
+│   │       ├── linkedin-post/SKILL.md
+│   │       └── twitter-post/SKILL.md
+│   └── managed_deep_agent/         (Managed Deep Agent — Module 6; self-contained mda project)
+│       ├── agent.py                (define_deep_agent + inline gateway-routed model)
+│       ├── instructions.md         (system prompt)
+│       ├── tools/search.py
+│       ├── skills/
+│       ├── memory.py
+│       ├── identity.py
+│       ├── pyproject.toml          (own deps — run `uv sync` inside this dir)
+│       └── .env.example
 ├── images/                         (diagrams used by the notebooks)
 └── modules/
     ├── 01_deep_agents.ipynb        (Module 1)
     ├── 02_langgraph.ipynb          (Module 2)
     ├── 03_deploy_and_govern.ipynb  (Module 3)
-    └── 04_langsmith.ipynb          (Module 4)
+    ├── 04_langsmith.ipynb          (Module 4)
+    ├── 05_engine.ipynb             (Module 5)
+    └── 06_managed_deep_agents.ipynb (Module 6)
 ```
 
 ## Common Issues
